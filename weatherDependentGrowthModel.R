@@ -21,7 +21,7 @@ nightlyPrecip=nightlyPrecip[,c('Year','Month','Day','Hour','Precipitation')]
 nightlyPrecip$TimeOfDay='morning'
 nightlyPrecip$TimeOfDay[nightlyPrecip$Hour>1200]='evening'
 
-getNightlyPrecip(year,month,day){
+getNightlyPrecip=function(year,month,day){
   #From the day given, get the previous days actual date from the unique list. This will account for nights across
   #different months, or years.
   todayIndex=which(uniqueDays$Year==year & uniqueDays$Month==month & uniqueDays$Day==day)
@@ -33,6 +33,8 @@ getNightlyPrecip(year,month,day){
   morningPrecip=subset(nightlyPrecip, Year==year & Month==month & Day==day & TimeOfDay=='morning')
   morningPrecip=sum(morningPrecip$Precipitation)
   
-  eveningPrecip=subset(nightlyPrecip, Year==yesterdayYear & Month==yesterdayMonth & day==yesterdayDay & TimeOfDay=='evening')
+  eveningPrecip=subset(nightlyPrecip, Year==yesterdayYear & Month==yesterdayMonth & Day==yesterdayDay & TimeOfDay=='evening')
   eveningPrecip=sum(eveningPrecip$Precipitation)
+  
+  return(morningPrecip+eveningPrecip)
 }
