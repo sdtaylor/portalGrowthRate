@@ -3,6 +3,8 @@ dataFolder='~/data/portal/'
 rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
 sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
+#For resources I use the total precip of the prior n months. n is:
+precipMonthLag=6
 
 ###################################################################################################
 #Functions to retrieve weather data
@@ -27,7 +29,7 @@ nightlyPrecip$TimeOfDay[nightlyPrecip$Hour>1200]='evening'
 #Get the total precip from a previous night of trapping
 
 getNightlyPrecip=function(year,month,day){
-  #From the day given, get the previous days actual date from the unique list. This will account for nights across
+  #From the day given, get the previous days actual date from the unique list. This will account for nights spanning
   #different months, or years.
   todayIndex=which(uniqueDays$Year==year & uniqueDays$Month==month & uniqueDays$Day==day)
   yesterdayIndex=todayIndex-1
@@ -89,6 +91,63 @@ getPrior6MonthPrecip=function(year, month, lag){
   
   return(totalPrecip)
 }
+
+##########################################################################################################
+#Functions to setup the data frame capture history + exogounous variables
+#########################################################################################################
+
+###########################################################
+#Take a portal dataframe and get a "mark" formatted capture history for each individual. 
+#does not do any processing for invalid periods, multiple spp, etc.
+processCH=function(df){
+  periods=sort(unique(df$period))
+  periods=min(periods):max(periods)
+  tagList=sort(unique(df$tag))
+  tagList=tagList[!is.na(tagList)]
+  tagList=tagList[tagList!='0']
+  tagList=tagList[tagList!='000000']
+  tagCHList=c()
+  
+  for(tag in tagList){
+    tag=as.character(tag)
+    #Get a list of periods this tag was seen in. 
+    thisTagPeriods=df$period[df$tag==tag]
+    thisTagPeriods=thisTagPeriods[!is.na(thisTagPeriods)] #The list is full of NA's! What?! why do I have to do this? screw you R
+    #convert list of seen/not seen periods to '00001001000111000.....' etc. and add it to the list of all tags
+    tagCHList=c(tagCHList, as.character(paste((periods %in% thisTagPeriods)*1, collapse='')))
+    
+    #Pack into a dataframe and ensure capture histories are set as characters
+    dfCH=data.frame(ch=tagCHList)
+    dfCH[] = lapply(dfCH, as.character)
+  }
+  return(dfCH)
+  
+}
+
+###########################################################
+#Get various weather variables for a particular period/plot
+getPlotWeatherInfo=function(period, plot){
+  dayOfTrapping=unique(rodents[rodents$period==300 & rodents$plot==5 , c('yr','dy','mo','period','plot')])
+  if(nrow(dayOfTrapping)>1){stop('trapping happend over >1 days!')}
+  
+  #dot = day of trapping
+  dotYear=dayOfTrapping$yr
+  dotMonth=dayOfTrapping$mo
+  dotDay=dayOfTrapping$dy
+  
+  nightlyTemp=getNightlyTemp(dotYear, dotMonth, dotDay)
+  nightlyPrecip=getNightlyPrecip(dotYear, dotMonth, dotDay)
+  prior6Precip=getPrior6MonthPrecip(dotYear, dotMonth, precipMonthLag)
+  
+  return(list(nightlyTemp=nightlyTemp, nightlyPrecip=nightlyPrecip, prior6MonthPrecip=prior6MonthPrecip))
+}
+
+
+
+#########################################################################################################
+#Setup the data
+###########################################################################################################
+
 
 
 
