@@ -1,7 +1,5 @@
 library(plyr)
-dataFolder='~/data/portal/'
-rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
-sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
+
 
 #For resources I use the total precip of the prior n months. n is:
 precipMonthLag=6
@@ -92,6 +90,10 @@ getPrior6MonthPrecip=function(year, month, lag){
   return(totalPrecip)
 }
 
+########################################################################
+#Setup a lookup table for every date
+
+
 ##########################################################################################################
 #Functions to setup the data frame capture history + exogounous variables
 #########################################################################################################
@@ -148,6 +150,46 @@ getPlotWeatherInfo=function(period, plot){
 #Setup the data
 ###########################################################################################################
 
+dataFolder='~/data/portal/'
+rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
+sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
 
+#1st try. only estimate after 1994 when pit tags were in heavy use. 
+rodents=rodents[rodents$yr>=1995,]
+rodents=rodents[rodents$yr<=2010,]
 
+rodents=rodents[rodents$period>0,]
+rodents=rodents[!is.na(rodents$plot),]
+rodents=rodents[!is.na(rodents$species),]
+
+#only need control and k-rat exclosure plots
+controlPlots=c(2,4,8,11,12,14,17,22) #controls
+kratPlots=c(3,6,13,18,19,20) #krat exclosure
+
+#Only model particular spp
+speciesToUse=c('PP','PB','OT')
+
+#maybe later
+#setupWeatherCH=function(df, plots, sp){
+#  ch=processCH(df) 
+#  periodInfo=unique(df[rodents$plot %in% controlPlots,c('period','plot','yr','mo','dy')])
+#  tagInfo=unique(rodents[rodents$plot %in% controlPlots & rodents$species==thisSpp, c('tag','period','plot') ])
+#}
+
+
+for(thisSpp in speciesToUse){
+  for(plotType in c('control','exclosure')){
+    #Get growth rates for this plotType/spp combo
+    if(plotType=='control'){ 
+      ch=processCH(subset(rodents, species==thisSpp & plot %in% controlPlots)) 
+      periodInfo=unique(rodents[rodents$plot %in% controlPlots,c('period','plot','yr','mo','dy')])
+      tagInfo=unique(rodents[rodents$plot %in% controlPlots & rodents$species==thisSpp, c('tag','period','plot') ])
+      }
+    if(plotType=='exclosure'){ 
+      ch=processCH(subset(rodents, species==thisSpp & plot %in% kratPlots)) 
+      }
+    
+    
+  }
+}
