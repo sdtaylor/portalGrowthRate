@@ -92,14 +92,16 @@ monthlyPrecipTotals = precipRaw %>%
                         summarize(precip=sum(Precipitation))
 
 #Setup an ordered list of months to figure out lags
-uniqueMonths=unique(precipRaw[,c('Year','Month')])
+uniqueMonths = uniqueDays %>%
+                select(Year,Month) %>%
+                distinct()
 #Explicetly order by year, and month
 uniqueMonths=uniqueMonths[with(uniqueMonths, order(Year,Month)),]
 
-getPrior6MonthPrecip=function(year, month, lag){
+getPrior6MonthPrecip=function(year, month){
   thisMonthIndex=which(uniqueMonths$Year==year & uniqueMonths$Month==month)
   #Say the row index for our inputed month is 150. With a lag of 6 months, this gives a list of indexes 149,148,147,146,145,144
-  priorMonthsIndex=(thisMonthIndex-lag) : (thisMonthIndex-1)
+  priorMonthsIndex=(thisMonthIndex-precipMonthLag) : (thisMonthIndex-1)
   #Now use those indexes to draw the actual year and months 
   priorYears=uniqueMonths$Year[priorMonthsIndex]
   priorMonths=uniqueMonths$Month[priorMonthsIndex]
@@ -133,7 +135,12 @@ nightlyLookupTable = rodents %>%
 }
 rm(nightlyLookupTableFile)
 
-
+#Lookup table for resources (precip) in the last 6 months
+resourceLookupTable = rodents %>%
+  select(period,yr,mo) %>%
+  distinct() %>%
+  rowwise() %>%
+  mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
 
 ##########################################################################################################
 #Functions to setup the data frame capture history + exogounous variables
