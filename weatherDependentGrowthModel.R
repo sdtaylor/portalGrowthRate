@@ -14,7 +14,10 @@ precipRaw=read.csv(paste(dataFolder,'Hourly_PPT_mm_1989_present_fixed.csv',sep='
 #Days in the capture data are always from the morning of trapping. So here I need to sum precip from the prior
 #night, or get the temp info across two different days. Mean sunset/sunrise times throughout the year are roughly 6pm-6am
 
-uniqueDays=unique(precipRaw[,c('Year','Month','Day')])
+uniqueDays = unlist(strsplit(as.character(seq.Date(as.Date('1977/1/1'), as.Date('2018/1/1'), 'days')), '-'))
+uniqueDays = data.frame(matrix(uniqueDays, ncol=3, byrow=TRUE))
+colnames(uniqueDays)=c('Year','Month','Day')
+
 #Explicetly order by year, month, and day
 uniqueDays=uniqueDays[with(uniqueDays, order(Year,Month,Day)),]
 #Extract hourly readings for the evening hours 6pm-6am
@@ -56,9 +59,21 @@ getNightlyTemp=function(year, month, day){
   yesterdayDay=uniqueDays$Day[yesterdayIndex]
   
   morningTemp=subset(nightlyPrecip, Year==year & Month==month & Day==day & TimeOfDay=='morning')
+  #Data is missing from some days. If thats the case then get the average nightly low from
+  #the prior 2 and the next 2 years.
+  if(nrow(morningTemp)<6){
+    morningTemp = filter(nightlyPrecip, (Year>=year-2 & year<=year+2) & Month==month & Day==day & TimeOfDay=='morning') %>%
+      group_by(Hour) %>%
+      summarize(TempAir=mean(TempAir))
+  }
   morningTemp=min(morningTemp$TempAir)
   
   eveningTemp=subset(nightlyPrecip, Year==yesterdayYear & Month==yesterdayMonth & Day==yesterdayDay & TimeOfDay=='evening')
+  if(nrow(eveningTemp)<6){
+    eveningTemp = filter(nightlyPrecip, (Year>=yesterdayYear-2 & year<=yesterdayYear+2) & Month==yesterdayMonth & Day==yesterdayDay & TimeOfDay=='evening')
+      group_by(Hour) %>%
+      summarize(TempAir=mean(TempAir))
+  }
   eveningTemp=min(eveningTemp$TempAir)
   
   return(min(morningTemp, eveningTemp))
