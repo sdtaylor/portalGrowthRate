@@ -1,5 +1,5 @@
 library(plyr)
-
+library(dplyr)
 
 #For resources I use the total precip of the prior n months. n is:
 precipMonthLag=6
@@ -91,8 +91,27 @@ getPrior6MonthPrecip=function(year, month, lag){
 }
 
 ########################################################################
-#Setup a lookup table for every date
+#Setup a lookup table for nightly precip and low temps for 
+#every period/plot/night combo. Takes a few minutes,
+#so store it for future use. 
 
+nightlyLookupTableFile=paste(dataFolder, 'nightlyLookup.csv')
+if(file.exists(nightlyLookupTableFile)){
+  nightlyLookupTable=read.csv(nightlyLookupTableFile)
+} else{
+nightlyLookupTable = rodents %>%
+  #Get actual trapping dates for every plot in every period
+  select(period, plot, yr, mo, dy) %>%
+  distinct() %>%
+  rowwise() %>%
+  #For each date/plot, get the nightly low temp and total precip, which affect probability of trapping
+  mutate(precip=getNightlyPrecip(yr,mo,dy), lowTemp=getNightlyTemp(yr,mo,dy))
+  #Save file for future use
+  write.csv(nightlyLookupTable, nightlyLookupTableFile, row.names=FALSE)
+}
+rm(nightlyLookupTableFile)
+
+pe
 
 ##########################################################################################################
 #Functions to setup the data frame capture history + exogounous variables
