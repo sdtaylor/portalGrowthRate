@@ -5,9 +5,29 @@ dataFolder='~/data/portal/'
 #For resources I use the total precip of the prior n months. n is:
 precipMonthLag=6
 
+
+rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
+sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
+
+#1st try. only estimate after 1994 when pit tags were in heavy use. 
+rodents=rodents[rodents$yr>=1995,]
+rodents=rodents[rodents$yr<=2010,]
+
+#Get trapping dates for *all* periods/plots before I cull things
+trappingDates=select(rodents, period, yr, mo, dy, plot) %>% distinct()
+trappingDates$period=abs(trappingDates$period)
+
+rodents=rodents[rodents$period>0,]
+rodents=rodents[!is.na(rodents$plot),]
+rodents=rodents[!is.na(rodents$species),]
+
+
 ###################################################################################################
 #Functions to retrieve weather data
 ##################################################################################################
+#Several functions to ultimately build 2 final lookup tables to quicly build mark data frames.
+#One for the nightly precip & low temperature for trapping probability
+#One for the prior 6 months of precip for survivorship
 precipRaw=read.csv(paste(dataFolder,'Hourly_PPT_mm_1989_present_fixed.csv',sep=''))
 
 
@@ -119,14 +139,12 @@ getPrior6MonthPrecip=function(year, month){
 #every period/plot/night combo. Takes a few minutes,
 #so store it for future use. 
 
-nightlyLookupTableFile=paste(dataFolder, 'nightlyLookup.csv')
+nightlyLookupTableFile=paste(dataFolder, 'nightlyLookup.csv',sep='')
 if(file.exists(nightlyLookupTableFile)){
   nightlyLookupTable=read.csv(nightlyLookupTableFile)
 } else{
-nightlyLookupTable = rodents %>%
-  #Get actual trapping dates for every plot in every period
-  select(period, plot, yr, mo, dy) %>%
-  distinct() %>%
+#trappingDates pulled from rodents file in the beginning
+nightlyLookupTable = trappingDates %>%
   rowwise() %>%
   #For each date/plot, get the nightly low temp and total precip, which affect probability of trapping
   mutate(precip=getNightlyPrecip(yr,mo,dy), lowTemp=getNightlyTemp(yr,mo,dy))
@@ -142,6 +160,7 @@ resourceLookupTable = rodents %>%
   rowwise() %>%
   mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
 
+rm(monthlyPrecipTotals, nightlyPrecip, precipRaw, uniqueDays, uniqueMonths, getNightlyTemp, getNightlyPrecip, getPrior6MonthPrecip)
 ##########################################################################################################
 #Functions to setup the data frame capture history + exogounous variables
 #########################################################################################################
@@ -176,6 +195,7 @@ processCH=function(df){
 
 ###########################################################
 #Get various weather variables for a particular period/plot
+#Don't think I actually use this
 getPlotWeatherInfo=function(period, plot){
   dayOfTrapping=unique(rodents[rodents$period==300 & rodents$plot==5 , c('yr','dy','mo','period','plot')])
   if(nrow(dayOfTrapping)>1){stop('trapping happend over >1 days!')}
@@ -198,17 +218,6 @@ getPlotWeatherInfo=function(period, plot){
 #Setup the data
 ###########################################################################################################
 
-rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
-sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
-
-
-#1st try. only estimate after 1994 when pit tags were in heavy use. 
-rodents=rodents[rodents$yr>=1995,]
-rodents=rodents[rodents$yr<=2010,]
-
-rodents=rodents[rodents$period>0,]
-rodents=rodents[!is.na(rodents$plot),]
-rodents=rodents[!is.na(rodents$species),]
 
 #only need control and k-rat exclosure plots
 controlPlots=c(2,4,8,11,12,14,17,22) #controls
@@ -230,8 +239,29 @@ for(thisSpp in speciesToUse){
     #Get growth rates for this plotType/spp combo
     if(plotType=='control'){ 
       ch=processCH(subset(rodents, species==thisSpp & plot %in% controlPlots)) 
-      periodInfo=unique(rodents[rodents$plot %in% controlPlots,c('period','plot','yr','mo','dy')])
+      periodInfo=unique(rodents[rodents$plot %in% controlPlots,c('period','plot')])
       tagInfo=unique(rodents[rodents$plot %in% controlPlots & rodents$species==thisSpp, c('tag','period','plot') ])
+      
+      periods=sort(unique(tagInfo$period))
+      periods=min(periods):max(periods)
+      tagList=unique(tagInfo$tag)
+      tagList=tagList[!is.na(tagList)]
+      tagList=tagList[tagList!='0']
+      tagList=tagList[tagList!='000000']
+      
+      weatherDF=matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2)
+      
+      for(thisTag in sort(unique(tagInfo$tag))){
+        #some critters roam around various plots, but it's not the norm. So just pick the plot it's in the most to model weather
+        thisTagPlot=tagInfo %>% filter(tag==thisTag)
+        thisTagPlot=median(thisTagPlot$plot)
+        thisTagPeriodInfo=expand.grid(periods, thisTagPlot)
+        colnames(thisTagPeriodInfo)=c('period','plot')
+        thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
+        
+        #Issue here. One period/plot (341 plot 12) has more than 1 trapping nights. One off 'thing' or occurs more regularly?
+        
+      }
       }
     if(plotType=='exclosure'){ 
       ch=processCH(subset(rodents, species==thisSpp & plot %in% kratPlots)) 
@@ -240,3 +270,7 @@ for(thisSpp in speciesToUse){
     
   }
 }
+
+x=rodents %>% group_by(tag) %>% summarize(numPlots=length(unique(plot)))
+
+
