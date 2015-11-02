@@ -1,5 +1,6 @@
-library(plyr)
 library(dplyr)
+
+dataFolder='~/data/portal/'
 
 #For resources I use the total precip of the prior n months. n is:
 precipMonthLag=6
@@ -14,9 +15,13 @@ precipRaw=read.csv(paste(dataFolder,'Hourly_PPT_mm_1989_present_fixed.csv',sep='
 #Days in the capture data are always from the morning of trapping. So here I need to sum precip from the prior
 #night, or get the temp info across two different days. Mean sunset/sunrise times throughout the year are roughly 6pm-6am
 
+#Get all days in the range of the study, so that you can easily lookup any previous day
 uniqueDays = unlist(strsplit(as.character(seq.Date(as.Date('1977/1/1'), as.Date('2018/1/1'), 'days')), '-'))
 uniqueDays = data.frame(matrix(uniqueDays, ncol=3, byrow=TRUE))
 colnames(uniqueDays)=c('Year','Month','Day')
+#These days started out as Date strings, so need to convert them to integers
+uniqueDays[] = lapply(uniqueDays, as.character) 
+uniqueDays[] = lapply(uniqueDays, as.integer)
 
 #Explicetly order by year, month, and day
 uniqueDays=uniqueDays[with(uniqueDays, order(Year,Month,Day)),]
@@ -70,7 +75,7 @@ getNightlyTemp=function(year, month, day){
   
   eveningTemp=subset(nightlyPrecip, Year==yesterdayYear & Month==yesterdayMonth & Day==yesterdayDay & TimeOfDay=='evening')
   if(nrow(eveningTemp)<6){
-    eveningTemp = filter(nightlyPrecip, (Year>=yesterdayYear-2 & year<=yesterdayYear+2) & Month==yesterdayMonth & Day==yesterdayDay & TimeOfDay=='evening')
+    eveningTemp = filter(nightlyPrecip, (Year>=yesterdayYear-2 & year<=yesterdayYear+2) & Month==yesterdayMonth & Day==yesterdayDay & TimeOfDay=='evening') %>%
       group_by(Hour) %>%
       summarize(TempAir=mean(TempAir))
   }
@@ -82,7 +87,9 @@ getNightlyTemp=function(year, month, day){
 ####################################################
 #Get the total precipiation from the prior n months (most likely 6)
 #A rolling n months that doesn't use 6 months seasons like most portal papers. Hopefully it's still fine. 
-montlyPrecipTotals=ddply(precipRaw, c('Year','Month'), summarize, precip=sum(Precipitation))
+monthlyPrecipTotals = precipRaw %>%
+                        group_by(Year, Month) %>%
+                        summarize(precip=sum(Precipitation))
 
 #Setup an ordered list of months to figure out lags
 uniqueMonths=unique(precipRaw[,c('Year','Month')])
@@ -126,7 +133,7 @@ nightlyLookupTable = rodents %>%
 }
 rm(nightlyLookupTableFile)
 
-pe
+
 
 ##########################################################################################################
 #Functions to setup the data frame capture history + exogounous variables
@@ -184,7 +191,6 @@ getPlotWeatherInfo=function(period, plot){
 #Setup the data
 ###########################################################################################################
 
-dataFolder='~/data/portal/'
 rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
 sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
