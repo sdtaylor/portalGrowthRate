@@ -271,6 +271,4 @@ for(thisSpp in speciesToUse){
   }
 }
 
-x=rodents %>% group_by(tag) %>% summarize(numPlots=length(unique(plot)))
-
 
