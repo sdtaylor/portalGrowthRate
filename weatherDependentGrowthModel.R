@@ -2,10 +2,6 @@ library(dplyr)
 
 dataFolder='~/data/portal/'
 
-#For resources I use the total precip of the prior n months. n is:
-precipMonthLag=6
-
-
 rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
 sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
@@ -20,6 +16,9 @@ trappingDates$period=abs(trappingDates$period)
 rodents=rodents[rodents$period>0,]
 rodents=rodents[!is.na(rodents$plot),]
 rodents=rodents[!is.na(rodents$species),]
+
+#For resources I use the total precip of the prior n months. n is:
+precipMonthLag=6
 
 
 ###################################################################################################
@@ -144,6 +143,23 @@ if(file.exists(nightlyLookupTableFile)){
   nightlyLookupTable=read.csv(nightlyLookupTableFile)
 } else{
 #trappingDates pulled from rodents file in the beginning
+  
+  #Some plots are trapped > 1 night per period. It's very rare but causes issues with this analysis.
+  #Here I account for that by finding those instances, and assigning just a single date for that plot/period.
+  #It could probably be written better, but whatever, it works. 
+  doubleDates= trappingDates %>% group_by(period, plot) %>% summarise(count=n()) %>% filter(count>1)
+  for(thisRow in 1:nrow(doubleDates)){
+    thisPeriod=doubleDates$period[thisRow]
+    thisPlot=doubleDates$plot[thisRow]
+    dateToUse=rodents %>% filter(period==thisPeriod, plot==thisPlot) %>% group_by(yr, mo, dy) %>% summarise(count=n()) 
+    dateToUse=dateToUse[which.max(dateToUse$count),]
+    trappingDates$yr[trappingDates$period==thisPeriod & trappingDates$plot==thisPlot]=dateToUse$yr
+    trappingDates$mo[trappingDates$period==thisPeriod & trappingDates$plot==thisPlot]=dateToUse$mo
+    trappingDates$dy[trappingDates$period==thisPeriod & trappingDates$plot==thisPlot]=dateToUse$dy
+  }
+  trappingDates=trappingDates %>% distinct()
+  
+  #Get nightly temp/precip values for each plot/period 
 nightlyLookupTable = trappingDates %>%
   rowwise() %>%
   #For each date/plot, get the nightly low temp and total precip, which affect probability of trapping
@@ -252,7 +268,8 @@ for(thisSpp in speciesToUse){
       weatherDF=matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2)
       
       for(thisTag in sort(unique(tagInfo$tag))){
-        #some critters roam around various plots, but it's not the norm. So just pick the plot it's in the most to model weather
+        #Because some mice roam around the plots, there is an issue with inputting weather info where you can't know which plot
+        #a mice wasn't caught in. It's definitly not the norm though, so just pick the plot it's in the most to model weather.
         thisTagPlot=tagInfo %>% filter(tag==thisTag)
         thisTagPlot=median(thisTagPlot$plot)
         thisTagPeriodInfo=expand.grid(periods, thisTagPlot)
