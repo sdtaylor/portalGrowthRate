@@ -1,4 +1,5 @@
 library(dplyr)
+library(marked)
 
 dataFolder='~/data/portal/'
 
@@ -160,7 +161,7 @@ if(file.exists(nightlyLookupTableFile)){
   trappingDates=trappingDates %>% distinct()
   
   #Get nightly temp/precip values for each plot/period 
-nightlyLookupTable = trappingDates %>%
+  nightlyLookupTable = trappingDates %>%
   rowwise() %>%
   #For each date/plot, get the nightly low temp and total precip, which affect probability of trapping
   mutate(precip=getNightlyPrecip(yr,mo,dy), lowTemp=getNightlyTemp(yr,mo,dy))
@@ -234,8 +235,10 @@ getPlotWeatherInfo=function(period, plot){
 }
 
 #########################################################
-#Combine capture history and nightly data of some rodent subset
-
+#Combine capture history and nightly weather data of an arbitrary rodent subset
+#This function combines everything above to make a data frame that RMark, or marked will work with. it looks like this.
+#ch, nightlyPrecip1, nightlyPrecip2, nightlyPrecip3, ...... nightlyTemp1, nightlyTemp2, nightlyTemp3,......
+#0010101110....., 0, 0, .3, ....... 14, 12, 14
 createMarkDF=function(rodentDF){
   ch=processCH(subset(rodents, species==thisSpp & plot %in% controlPlots)) 
   ch=processCH(rodentDF)
@@ -263,6 +266,7 @@ createMarkDF=function(rodentDF){
     thisTagPlot=mode(thisTagPlot$plot)
     thisTagPeriodInfo=expand.grid(periods, thisTagPlot)
     colnames(thisTagPeriodInfo)=c('period','plot')
+    
     thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
     thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
   
