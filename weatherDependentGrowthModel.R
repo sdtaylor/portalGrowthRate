@@ -176,7 +176,8 @@ resourceLookupTable = rodents %>%
   rowwise() %>%
   mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
 
-rm(monthlyPrecipTotals, nightlyPrecip, precipRaw, uniqueDays, uniqueMonths, getNightlyTemp, getNightlyPrecip, getPrior6MonthPrecip)
+rm(monthlyPrecipTotals, nightlyPrecip, precipRaw, uniqueDays, uniqueMonths, getNightlyTemp, getNightlyPrecip, getPrior6MonthPrecip, doubleDates
+   thisPeriod, thisPlot, thisRow, dateToUse)
 ##########################################################################################################
 #Functions to setup the data frame capture history + exogounous variables
 #########################################################################################################
@@ -209,6 +210,10 @@ processCH=function(df){
   
 }
 
+mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 ###########################################################
 #Get various weather variables for a particular period/plot
 #Don't think I actually use this
@@ -264,21 +269,32 @@ for(thisSpp in speciesToUse){
       tagList=tagList[!is.na(tagList)]
       tagList=tagList[tagList!='0']
       tagList=tagList[tagList!='000000']
+      tagList=sort(tagList)
       
-      weatherDF=matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2)
+      weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2))
+      precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
+      tempColNames=paste('nightlyTemp',1:length(periods), sep='')
+      colnames(weatherDF)=c(precipColnames, tempColNames)
       
-      for(thisTag in sort(unique(tagInfo$tag))){
+      for(thisTagIndex in 1:length(tagList)){
+        thisTag=tagList[thisTagIndex]
         #Because some mice roam around the plots, there is an issue with inputting weather info where you can't know which plot
-        #a mice wasn't caught in. It's definitly not the norm though, so just pick the plot it's in the most to model weather.
+        #a mice *wasn't* caught in. It's definitly not the norm though, so just pick the plot it's in the most to model weather.
         thisTagPlot=tagInfo %>% filter(tag==thisTag)
-        thisTagPlot=median(thisTagPlot$plot)
+        thisTagPlot=mode(thisTagPlot$plot)
         thisTagPeriodInfo=expand.grid(periods, thisTagPlot)
         colnames(thisTagPeriodInfo)=c('period','plot')
         thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
+        thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
         
-        #Issue here. One period/plot (341 plot 12) has more than 1 trapping nights. One off 'thing' or occurs more regularly?
+        weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
+        weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
         
       }
+      
+      #Merge capture history and nightly weather data
+      ch=cbind(ch, weatherDF)
+      
       }
     if(plotType=='exclosure'){ 
       ch=processCH(subset(rodents, species==thisSpp & plot %in% kratPlots)) 
