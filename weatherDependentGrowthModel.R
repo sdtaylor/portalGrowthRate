@@ -211,6 +211,8 @@ processCH=function(df){
   
 }
 
+#############################################################
+#Mode of a vector of numbers, used for various things
 mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
@@ -240,10 +242,8 @@ getPlotWeatherInfo=function(period, plot){
 #ch, nightlyPrecip1, nightlyPrecip2, nightlyPrecip3, ...... nightlyTemp1, nightlyTemp2, nightlyTemp3,......
 #0010101110....., 0, 0, .3, ....... 14, 12, 14
 createMarkDF=function(rodentDF){
-  ch=processCH(subset(rodents, species==thisSpp & plot %in% controlPlots)) 
   ch=processCH(rodentDF)
-  periodInfo=unique(rodents[rodents$plot %in% controlPlots,c('period','plot')])
-  tagInfo=unique(rodents[rodents$plot %in% controlPlots & rodents$species==thisSpp, c('tag','period','plot') ])
+  tagInfo=rodentDF %>% select(tag, period, plot)
 
   periods=sort(unique(tagInfo$period))
   periods=min(periods):max(periods)
@@ -256,7 +256,7 @@ createMarkDF=function(rodentDF){
   weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2))
   precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
   tempColNames=paste('nightlyTemp',1:length(periods), sep='')
-  colnames(weatherDF)=c(precipColnames, tempColNames)
+  colnames(weatherDF)=c(precipColNames, tempColNames)
 
   for(thisTagIndex in 1:length(tagList)){
     thisTag=tagList[thisTagIndex]
@@ -289,18 +289,20 @@ controlPlots=c(2,4,8,11,12,14,17,22) #controls
 kratPlots=c(3,6,13,18,19,20) #krat exclosure
 
 #Only model particular spp
-speciesToUse=c('PP','PB','OT')
+speciesToUse=c('PP')
+controlPlots=c(2) #controls
 
-
+finalDF=data.frame(species=character(), plot=integer(), plotType=character(), period=integer(), N=integer())
 
 for(thisSpp in speciesToUse){
   for(plotType in c('control','exclosure')){
     #Get growth rates for this plotType/spp combo
     if(plotType=='control'){ 
-      x=createMarkDF(filter(rodents, species==thisSpp, plot %in% controlPlots))
+      for(thisPlot in controlPlots){
+        x=createMarkDF(filter(rodents, species==thisSpp, plot ==thisPlot))
+        }
       }
     if(plotType=='exclosure'){ 
-      x=createMarkDF(filter(rodents, species==thisSpp, plot %in% kratPlots))
       }
     
     
