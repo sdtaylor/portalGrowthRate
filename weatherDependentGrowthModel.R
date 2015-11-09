@@ -233,8 +233,48 @@ getPlotWeatherInfo=function(period, plot){
   return(list(nightlyTemp=nightlyTemp, nightlyPrecip=nightlyPrecip, prior6MonthPrecip=prior6MonthPrecip))
 }
 
+#########################################################
+#Combine capture history and nightly data of some rodent subset
 
+createMarkDF=function(rodentDF){
+  ch=processCH(subset(rodents, species==thisSpp & plot %in% controlPlots)) 
+  ch=processCH(rodentDF)
+  periodInfo=unique(rodents[rodents$plot %in% controlPlots,c('period','plot')])
+  tagInfo=unique(rodents[rodents$plot %in% controlPlots & rodents$species==thisSpp, c('tag','period','plot') ])
 
+  periods=sort(unique(tagInfo$period))
+  periods=min(periods):max(periods)
+  tagList=unique(tagInfo$tag)
+  tagList=tagList[!is.na(tagList)]
+  tagList=tagList[tagList!='0']
+  tagList=tagList[tagList!='000000']
+  tagList=sort(tagList)
+
+  weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2))
+  precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
+  tempColNames=paste('nightlyTemp',1:length(periods), sep='')
+  colnames(weatherDF)=c(precipColnames, tempColNames)
+
+  for(thisTagIndex in 1:length(tagList)){
+    thisTag=tagList[thisTagIndex]
+    #Because some mice roam around the plots, there is an issue with inputting weather info where you can't know which plot
+    #a mice *wasn't* caught in. It's definitly not the norm though, so just pick the plot it's in the most to model weather.
+    thisTagPlot=tagInfo %>% filter(tag==thisTag)
+    thisTagPlot=mode(thisTagPlot$plot)
+    thisTagPeriodInfo=expand.grid(periods, thisTagPlot)
+    colnames(thisTagPeriodInfo)=c('period','plot')
+    thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
+    thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
+  
+    weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
+    weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
+  
+}
+
+  #Merge capture history and nightly weather data
+  ch=cbind(ch, weatherDF)
+  return(ch)
+}
 #########################################################################################################
 #Setup the data
 ###########################################################################################################
@@ -247,57 +287,16 @@ kratPlots=c(3,6,13,18,19,20) #krat exclosure
 #Only model particular spp
 speciesToUse=c('PP','PB','OT')
 
-#maybe later
-#setupWeatherCH=function(df, plots, sp){
-#  ch=processCH(df) 
-#  periodInfo=unique(df[rodents$plot %in% controlPlots,c('period','plot','yr','mo','dy')])
-#  tagInfo=unique(rodents[rodents$plot %in% controlPlots & rodents$species==thisSpp, c('tag','period','plot') ])
-#}
 
 
 for(thisSpp in speciesToUse){
   for(plotType in c('control','exclosure')){
     #Get growth rates for this plotType/spp combo
     if(plotType=='control'){ 
-      ch=processCH(subset(rodents, species==thisSpp & plot %in% controlPlots)) 
-      periodInfo=unique(rodents[rodents$plot %in% controlPlots,c('period','plot')])
-      tagInfo=unique(rodents[rodents$plot %in% controlPlots & rodents$species==thisSpp, c('tag','period','plot') ])
-      
-      periods=sort(unique(tagInfo$period))
-      periods=min(periods):max(periods)
-      tagList=unique(tagInfo$tag)
-      tagList=tagList[!is.na(tagList)]
-      tagList=tagList[tagList!='0']
-      tagList=tagList[tagList!='000000']
-      tagList=sort(tagList)
-      
-      weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2))
-      precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
-      tempColNames=paste('nightlyTemp',1:length(periods), sep='')
-      colnames(weatherDF)=c(precipColnames, tempColNames)
-      
-      for(thisTagIndex in 1:length(tagList)){
-        thisTag=tagList[thisTagIndex]
-        #Because some mice roam around the plots, there is an issue with inputting weather info where you can't know which plot
-        #a mice *wasn't* caught in. It's definitly not the norm though, so just pick the plot it's in the most to model weather.
-        thisTagPlot=tagInfo %>% filter(tag==thisTag)
-        thisTagPlot=mode(thisTagPlot$plot)
-        thisTagPeriodInfo=expand.grid(periods, thisTagPlot)
-        colnames(thisTagPeriodInfo)=c('period','plot')
-        thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
-        thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
-        
-        weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
-        weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
-        
-      }
-      
-      #Merge capture history and nightly weather data
-      ch=cbind(ch, weatherDF)
-      
+      x=createMarkDF(filter(rodents, species==thisSpp, plot %in% controlPlots))
       }
     if(plotType=='exclosure'){ 
-      ch=processCH(subset(rodents, species==thisSpp & plot %in% kratPlots)) 
+      x=createMarkDF(filter(rodents, species==thisSpp, plot %in% kratPlots))
       }
     
     
