@@ -279,6 +279,22 @@ createMarkDF=function(rodentDF){
   ch=cbind(ch, weatherDF)
   return(ch)
 }
+
+##################################################################################
+#The mark/recapture model!
+runModel=function(df){
+  #Don't understand the need for all this, I just copied it from the marked helpfile.
+  x.proc=process.data(df, accumulate=FALSE)
+  
+  design.p=list(time.varying=c('nightlyPrecip','nightlyTemp'))
+  design.parameters=list(p=design.p)
+  ddl=make.design.data(x.proc, parameters=design.parameters)
+  
+  p.formula=list(formula=~nightlyPrecip+nightlyTemp+Time)
+  model=crm(x.proc, ddl, hessian=FALSE, model.parameters = list(p=p.formula), accumulate = FALSE, model='cjs')
+  return(model$results$reals$p)
+}
+
 #########################################################################################################
 #Setup the data
 ###########################################################################################################
@@ -289,24 +305,32 @@ controlPlots=c(2,4,8,11,12,14,17,22) #controls
 kratPlots=c(3,6,13,18,19,20) #krat exclosure
 
 #Only model particular spp
-speciesToUse=c('PP')
-controlPlots=c(2) #controls
+speciesToUse=c('PP','DM')
 
-finalDF=data.frame(species=character(), plot=integer(), plotType=character(), period=integer(), N=integer())
+finalDF=data.frame(species=character(), plot=integer(), plotType=character(), nightlyTemp=integer(), p=integer())
 
 for(thisSpp in speciesToUse){
   for(plotType in c('control','exclosure')){
     #Get growth rates for this plotType/spp combo
     if(plotType=='control'){ 
       for(thisPlot in controlPlots){
-        x=createMarkDF(filter(rodents, species==thisSpp, plot ==thisPlot))
+        x=runModel(createMarkDF(filter(rodents, species==thisSpp, plot ==thisPlot)))
+        x$species=thisSpp
+        x$plot=thisPlot
+        x$plotType=plotType
+        x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
+        finalDF=rbind(finalDF, x)
         }
       }
     if(plotType=='exclosure'){ 
+      
       }
     
     
   }
 }
 
+with(finalDF[finalDF$species=='PP',], plot(estimate~nightlyTemp, main='Pocket Mouse (PP)',xlab='Nightly Low Temp', ylab='Trapping Probability'))
+
+with(finalDF[finalDF$species=='DM',], plot(estimate~nightlyTemp, main='Kangaroo Rat (DM)', xlab='Nightly Low Temp', ylab='Trapping Probability'))
 
