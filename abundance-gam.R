@@ -7,6 +7,9 @@ dataFolder='~/data/portal/'
 rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
 sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
+#1st try. only estimate after 1994 when pit tags were in heavy use. 
+rodents=rodents[rodents$yr>=1995,]
+rodents=rodents[rodents$yr<=2010,]
 
 #Get trapping dates for *all* periods/plots before I cull things
 trappingDates=select(rodents, period, yr, mo, dy, plot) %>% distinct()
@@ -186,18 +189,27 @@ kratPlots=c(3,6,13,18,19,20) #krat exclosure
 library(lubridate)
 library(mgcv)
 
+
+allPeriods=unique(rodents$period)
+allPlots=c(controlPlots,kratPlots)
+allPeriodPlots=expand.grid(allPeriods, allPlots)
+colnames(allPeriodPlots)=c('period','plot')
+
 # Note that yr_continuous may drift a bit with leap years, but should never be
 # more than one day from the correct value
 munge_species = function(sp){
-  rodents %>% 
+    rodents %>% 
     filter(species == sp) %>%
-    group_by(mo, dy, yr, plot) %>%
+    group_by(period, plot) %>%
     summarize(abundance = n()) %>%
     ungroup() %>%
+    full_join(allPeriodPlots, c('period','plot')) %>%
+    replace(is.na(.), 0) %>%
     mutate(is_control = plot %in% controlPlots) %>% 
     mutate(is_exclosure = plot %in% kratPlots) %>%
-    inner_join(resourceLookupTable, c("mo", "yr")) %>%
-    inner_join(nightlyLookupTable, c("mo", "dy", "yr", "plot", "period")) %>%
+    inner_join(resourceLookupTable, c("period")) %>%
+    select(-yr, -mo) %>%
+    inner_join(nightlyLookupTable, c("plot", "period")) %>%
     mutate(date = as.Date(paste(yr, mo, dy, sep = "-"))) %>% 
     mutate(yday = yday(date)) %>%
     mutate(yr_continuous = julian(date, origin = as.Date("1900-01-01")) / 365.24 + 1900)
