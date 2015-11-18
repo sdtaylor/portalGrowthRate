@@ -177,7 +177,7 @@ resourceLookupTable = rodents %>%
   rowwise() %>%
   mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
 
-rm(monthlyPrecipTotals, nightlyPrecip, precipRaw, uniqueDays, uniqueMonths, getNightlyTemp, getNightlyPrecip, getPrior6MonthPrecip, doubleDates
+rm(monthlyPrecipTotals, nightlyPrecip, precipRaw, uniqueDays, uniqueMonths, getNightlyTemp, getNightlyPrecip, getPrior6MonthPrecip, doubleDates,
    thisPeriod, thisPlot, thisRow, dateToUse)
 ##########################################################################################################
 #Functions to setup the data frame capture history + exogounous variables
