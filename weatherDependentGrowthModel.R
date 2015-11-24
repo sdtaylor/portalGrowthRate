@@ -384,12 +384,9 @@ speciesToUse=c('PP','DM')
 finalDF=data.frame(species=character(), plot=integer(), plotType=character(), nightlyTemp=integer(), p=integer())
 
 #finalDF=foreach(plotType = c('control','exclosure'), .combine=rbind, .packages)
-
-for(plotType in c('control','exclosure')){
+for(thisPlot in c(controlPlots, kratPlots)){
   for(thisSpp in speciesToUse){
     #Get growth rates for this plotType/spp combo
-    if(plotType=='control'){ 
-      for(thisPlot in controlPlots){
         x = rodents %>%
           filter(species==thisSpp, plot==thisPlot) %>%
           pradelGR()
@@ -398,23 +395,11 @@ for(plotType in c('control','exclosure')){
         x$plotType=plotType
         #x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
         finalDF=rbind(finalDF, x)
-        }
-    }
-    if(plotType=='exclosure'){ 
-      for(thisPlot in kratPlots){
-        x = rodents %>%
-          filter(species==thisSpp, plot==thisPlot) %>%
-          pradelGR()
-        x$species=thisSpp
-        x$plot=thisPlot
-        x$plotType=plotType
-        #x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
-        finalDF=rbind(finalDF, x)
-      }
-    }
     
   }
 }
+finalDF$plotType='control'
+finalDF$plotType[finalDF$plot %in% kratPlots]='kratPlot'
 finalDF=merge(finalDF, resourceLookupTable, all.x=TRUE, all.y=FALSE, by='period')
 
 write.csv(paste(dataFolder, 'finalGrowthDF.csv'), row.names = FALSE)
