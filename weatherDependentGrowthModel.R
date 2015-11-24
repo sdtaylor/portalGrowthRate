@@ -217,6 +217,10 @@ mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
+#####################
+#Reverse a single string. Used to compute gamma below
+reverseString=function(x){return(paste(rev(strsplit(x,NULL)[[1]]),collapse=""))}
+
 ###########################################################
 #Get various weather variables for a particular period/plot
 #Don't think I actually use this
@@ -236,17 +240,26 @@ getPlotWeatherInfo=function(period, plot){
   return(list(nightlyTemp=nightlyTemp, nightlyPrecip=nightlyPrecip, prior6MonthPrecip=prior6MonthPrecip))
 }
 
-#########################################################
+
+
+##########################################################
 #Combine capture history and nightly weather data of an arbitrary rodent subset
 #This function combines everything above to make a data frame that RMark, or marked will work with. it looks like this.
 #ch, nightlyPrecip1, nightlyPrecip2, nightlyPrecip3, ...... nightlyTemp1, nightlyTemp2, nightlyTemp3,......
 #0010101110....., 0, 0, .3, ....... 14, 12, 14
-createMarkDF=function(rodentDF){
+createMarkDF=function(rodentDF, reverse=FALSE){
   ch=processCH(rodentDF)
   tagInfo=rodentDF %>% select(tag, period, plot)
+  
+  if(reverse){
+    newCH=c()
+    for(i in ch$ch){newCH=c(newCH,reverseString(i))}
+    ch$ch=newCH
+    
 
+  } 
   periods=sort(unique(tagInfo$period))
-  periods=min(periods):max(periods)
+  periods=max(periods):min(periods)
   tagList=unique(tagInfo$tag)
   tagList=tagList[!is.na(tagList)]
   tagList=tagList[tagList!='0']
@@ -269,11 +282,13 @@ createMarkDF=function(rodentDF){
     
     thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
     thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
+    
+    if(reverse){ thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(-period)}
   
     weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
     weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
   
-}
+   }
 
   #Merge capture history and nightly weather data
   ch=cbind(ch, weatherDF)
@@ -314,7 +329,10 @@ for(thisSpp in speciesToUse){
     #Get growth rates for this plotType/spp combo
     if(plotType=='control'){ 
       for(thisPlot in controlPlots){
-        x=runModel(createMarkDF(filter(rodents, species==thisSpp, plot ==thisPlot)))
+        x = rodents %>%
+          filter(species==thisSpp, plot==thisPlot) %>%
+          createMarkDF() %>%
+          runModel()
         x$species=thisSpp
         x$plot=thisPlot
         x$plotType=plotType
