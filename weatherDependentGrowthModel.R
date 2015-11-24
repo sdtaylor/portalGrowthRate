@@ -259,7 +259,7 @@ createMarkDF=function(rodentDF, reverse=FALSE){
 
   } 
   periods=sort(unique(tagInfo$period))
-  periods=max(periods):min(periods)
+  periods=min(periods):max(periods)
   tagList=unique(tagInfo$tag)
   tagList=tagList[!is.na(tagList)]
   tagList=tagList[tagList!='0']
@@ -306,8 +306,38 @@ runModel=function(df){
   ddl=make.design.data(x.proc, parameters=design.parameters)
   
   p.formula=list(formula=~nightlyPrecip+nightlyTemp+Time)
-  model=crm(x.proc, ddl, hessian=FALSE, model.parameters = list(p=p.formula), accumulate = FALSE, model='cjs')
-  return(model$results$reals$p)
+  phi.formula=list(formula=~Time)
+  model=crm(x.proc, ddl, hessian=FALSE, model.parameters = list(p=p.formula, Phi=phi.formula), accumulate = FALSE, model='cjs')
+  return(model$results$reals)
+}
+
+####################################################################################
+#Get growth rate using Pradel method
+pradelGR=function(df){
+  Phi= df %>%
+    createMarkDF() %>%
+    runModel()
+  Phi=Phi$Phi
+  Phi=arrange(Phi, -occ)
+  
+  Gamma= df %>%
+    createMarkDF(reverse=TRUE) %>%
+    runModel()
+  Gamma=Gamma$Phi
+  Gamma=arrange(Gamma, -occ)
+  
+  periods=sort(unique(df$period))
+  periods=min(periods):max(periods) #Account for some periods not having any captures
+  #Growth rates for each timestep are Phi + Gamma for each interval between sampling occurences. 
+  #Line up gamma estimates with time periods from phi. This is kinda complicated. 
+  Gamma$period=periods[2:length(periods)]
+  Phi$period=periods[(length(periods)-1):1]
+ 
+  growthRates=data.frame(period=integer(), growth=integer())
+  #Ineficient for loop for clarities sake
+  for(thisPeriod in periods[2:(length(periods)-1)]){
+    growthRates=rbind(growthRates, data.frame(period=thisPeriod, growth=(Phi$estimate[Phi$period==thisPeriod]/Gamma$estimate[Gamma$period==thisPeriod+1])))
+  } 
 }
 
 #########################################################################################################
