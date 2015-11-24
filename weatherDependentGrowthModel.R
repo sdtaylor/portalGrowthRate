@@ -1,7 +1,20 @@
 library(dplyr)
-library(marked)
+library(doParallel)
 
-dataFolder='~/data/portal/'
+args=commandArgs(trailingOnly = TRUE)
+if(args[1]=='hipergator'){
+  dataFolder='/scratch/lfs/shawntaylor/'
+  library(devtools)
+  load_all(paste(dataFolder, 'marked/marked/'))
+  
+  numProcs=32
+} else {
+  library(marked)
+  dataFolder='~/data/portal/'
+}
+
+
+
 
 rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings=c("","NA"), colClasses=c('tag'='character'))
 sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
@@ -357,7 +370,9 @@ pradelGR=function(df){
 #########################################################################################################
 #Setup the data
 ###########################################################################################################
-
+#Setup parallel processing
+cl=makeCluster(numCores)
+registerDoParallel(cl)
 
 #only need control and k-rat exclosure plots
 controlPlots=c(2,4,8,11,12,14,17,22) #controls
@@ -368,8 +383,10 @@ speciesToUse=c('PP','DM')
 
 finalDF=data.frame(species=character(), plot=integer(), plotType=character(), nightlyTemp=integer(), p=integer())
 
-for(thisSpp in speciesToUse){
-  for(plotType in c('control','exclosure')){
+#finalDF=foreach(plotType = c('control','exclosure'), .combine=rbind, .packages)
+
+for(plotType in c('control','exclosure'){
+  for(thisSpp in speciesToUse){
     #Get growth rates for this plotType/spp combo
     if(plotType=='control'){ 
       for(thisPlot in controlPlots){
@@ -382,16 +399,25 @@ for(thisSpp in speciesToUse){
         #x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
         finalDF=rbind(finalDF, x)
         }
-      }
+    }
     if(plotType=='exclosure'){ 
-      
+      for(thisPlot in kratPlots){
+        x = rodents %>%
+          filter(species==thisSpp, plot==thisPlot) %>%
+          pradelGR()
+        x$species=thisSpp
+        x$plot=thisPlot
+        x$plotType=plotType
+        #x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
+        finalDF=rbind(finalDF, x)
       }
-    
+    }
     
   }
 }
+finalDF=merge(finalDF, resourceLookupTable, all.x=TRUE, all.y=FALSE, by='period')
 
-with(finalDF[finalDF$species=='PP',], plot(estimate~nightlyTemp, main='Pocket Mouse (PP)',xlab='Nightly Low Temp', ylab='Trapping Probability'))
+write.csv(paste(dataFolder, 'finalGrowthDF.csv'), row.names = FALSE)
 
-with(finalDF[finalDF$species=='DM',], plot(estimate~nightlyTemp, main='Kangaroo Rat (DM)', xlab='Nightly Low Temp', ylab='Trapping Probability'))
-
+#ggplot(finalDF, aes(x=totalPrecip, y=growth, colour=species, shape=plotType, group=interaction(species, plotType)))+geom_point()+geom_line()
+#ggplot(filter(finalDF, species=='PP'), aes(x=totalPrecip, y=growth, colour=plotType, group=plotType))+geom_point()
