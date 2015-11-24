@@ -2,7 +2,7 @@ library(dplyr)
 library(doParallel)
 
 args=commandArgs(trailingOnly = TRUE)
-if(args[1]=='hipergator'){
+if(length(args)>0){
   dataFolder='/scratch/lfs/shawntaylor/data/portal/'
   library(devtools)
   load_all(paste('/scratch/lfs/shawntaylor/marked/marked/'))
@@ -385,7 +385,7 @@ finalDF=data.frame(species=character(), plot=integer(), plotType=character(), ni
 
 #finalDF=foreach(plotType = c('control','exclosure'), .combine=rbind, .packages)
 
-for(plotType in c('control','exclosure'){
+for(plotType in c('control','exclosure')){
   for(thisSpp in speciesToUse){
     #Get growth rates for this plotType/spp combo
     if(plotType=='control'){ 
