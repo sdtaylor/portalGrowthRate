@@ -171,9 +171,12 @@ if(file.exists(nightlyLookupTableFile)){
 rm(nightlyLookupTableFile)
 
 #Lookup table for resources (precip) in the last 6 months
-resourceLookupTable = rodents %>%
+resourceLookupTable = trappingDates %>%
   select(period,yr,mo) %>%
   distinct() %>%
+  group_by(period) %>%
+  filter(row_number()==1) %>%
+  ungroup() %>%
   rowwise() %>%
   mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
 
@@ -266,11 +269,16 @@ createMarkDF=function(rodentDF, reverse=FALSE){
   tagList=tagList[tagList!='000000']
   tagList=sort(tagList)
 
-  weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*2))
+  weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*3))
   precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
   tempColNames=paste('nightlyTemp',1:length(periods), sep='')
-  colnames(weatherDF)=c(precipColNames, tempColNames)
+  resourceColNames=paste('resources',1:length(periods), sep='')
+  colnames(weatherDF)=c(precipColNames, tempColNames, resourceColNames)
 
+  #Put in resources availability. 
+  resources=resourceLookupTable %>% filter(period %in% periods)
+  if(reverse){ resources= resources %>% arrange(-period) }
+  
   for(thisTagIndex in 1:length(tagList)){
     thisTag=tagList[thisTagIndex]
     #Because some mice roam around the plots, there is an issue with inputting weather info where you can't know which plot
@@ -283,12 +291,15 @@ createMarkDF=function(rodentDF, reverse=FALSE){
     thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
     thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
     
-    if(reverse){ thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(-period)}
+    if(reverse){ thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(-period) }
+    
   
     weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
     weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
+    weatherDF[thisTagIndex,resourceColNames]=resources$totalPrecip
+    
+  }
   
-   }
 
   #Merge capture history and nightly weather data
   ch=cbind(ch, weatherDF)
@@ -338,6 +349,7 @@ pradelGR=function(df){
   for(thisPeriod in periods[2:(length(periods)-1)]){
     growthRates=rbind(growthRates, data.frame(period=thisPeriod, growth=(Phi$estimate[Phi$period==thisPeriod]/Gamma$estimate[Gamma$period==thisPeriod+1])))
   } 
+  return(growthRates)
 }
 
 #########################################################################################################
@@ -360,9 +372,8 @@ for(thisSpp in speciesToUse){
     if(plotType=='control'){ 
       for(thisPlot in controlPlots){
         x = rodents %>%
-          filter(species==thisSpp, plot==thisPlot) %>%
-          createMarkDF() %>%
-          runModel()
+          filter(species==thisSpp, plot==thisPlot, yr==1999) %>%
+          pradelGR()
         x$species=thisSpp
         x$plot=thisPlot
         x$plotType=plotType
