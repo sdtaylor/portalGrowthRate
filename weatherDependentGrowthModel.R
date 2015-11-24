@@ -3,9 +3,9 @@ library(doParallel)
 
 args=commandArgs(trailingOnly = TRUE)
 if(args[1]=='hipergator'){
-  dataFolder='/scratch/lfs/shawntaylor/'
+  dataFolder='/scratch/lfs/shawntaylor/data/portal/'
   library(devtools)
-  load_all(paste(dataFolder, 'marked/marked/'))
+  load_all(paste('/scratch/lfs/shawntaylor/marked/marked/'))
   
   numProcs=32
 } else {
@@ -371,8 +371,8 @@ pradelGR=function(df){
 #Setup the data
 ###########################################################################################################
 #Setup parallel processing
-cl=makeCluster(numCores)
-registerDoParallel(cl)
+#cl=makeCluster(numCores)
+#registerDoParallel(cl)
 
 #only need control and k-rat exclosure plots
 controlPlots=c(2,4,8,11,12,14,17,22) #controls
