@@ -313,11 +313,13 @@ runModel=function(df){
   x.proc=process.data(df, accumulate=FALSE)
   
   design.p=list(time.varying=c('nightlyPrecip','nightlyTemp'))
-  design.parameters=list(p=design.p)
+  design.phi=list(time.varying=c('resources'))
+  
+  design.parameters=list(p=design.p, Phi=design.phi)
   ddl=make.design.data(x.proc, parameters=design.parameters)
   
   p.formula=list(formula=~nightlyPrecip+nightlyTemp+Time)
-  phi.formula=list(formula=~Time)
+  phi.formula=list(formula=~resources+Time)
   model=crm(x.proc, ddl, hessian=FALSE, model.parameters = list(p=p.formula, Phi=phi.formula), accumulate = FALSE, model='cjs')
   return(model$results$reals)
 }
@@ -372,12 +374,12 @@ for(thisSpp in speciesToUse){
     if(plotType=='control'){ 
       for(thisPlot in controlPlots){
         x = rodents %>%
-          filter(species==thisSpp, plot==thisPlot, yr==1999) %>%
+          filter(species==thisSpp, plot==thisPlot) %>%
           pradelGR()
         x$species=thisSpp
         x$plot=thisPlot
         x$plotType=plotType
-        x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
+        #x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
         finalDF=rbind(finalDF, x)
         }
       }
