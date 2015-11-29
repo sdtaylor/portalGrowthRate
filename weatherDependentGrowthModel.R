@@ -27,6 +27,16 @@ rodents=rodents[rodents$yr<=2010,]
 trappingDates=select(rodents, period, yr, mo, dy, plot) %>% distinct()
 trappingDates$period=abs(trappingDates$period)
 
+#Some periods have missing plots that need to be filled in. There aren't many so I just 
+#went and figure them out by hand
+missingValues=data.frame(period=c(252,263,272,272,273,284,306),
+                         plot=c(24,7,23,24,3,24,16),
+                         yr=c(1999,2000,2001,2001,2001,2002,2003),
+                         mo=c(2,3,1,1,3,1,11),
+                         dy=c(20,4,21,21,4,12,22))
+trappingDates=rbind(trappingDates, missingValues)
+rm(missingValues)
+
 rodents=rodents[rodents$period>0,]
 rodents=rodents[!is.na(rodents$plot),]
 rodents=rodents[!is.na(rodents$species),]
@@ -387,16 +397,15 @@ finalDF=data.frame(species=character(), plot=integer(), plotType=character(), ni
 for(thisPlot in c(controlPlots, kratPlots)){
   for(thisSpp in speciesToUse){
     #Get growth rates for this plotType/spp combo
+        print(paste(thisPlot, thisSpp, sep=' '))
         x = rodents %>%
           filter(species==thisSpp, plot==thisPlot) %>%
           pradelGR()
         x$species=thisSpp
         x$plot=thisPlot
-        x$plotType=plotType
         #x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
         finalDF=rbind(finalDF, x)
-    
-  }
+    }
 }
 finalDF$plotType='control'
 finalDF$plotType[finalDF$plot %in% kratPlots]='kratPlot'
