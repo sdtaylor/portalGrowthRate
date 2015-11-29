@@ -383,7 +383,7 @@ pradelGR=function(df){
 #Setup the data
 ###########################################################################################################
 #Setup parallel processing
-cl=makeCluster(numCores)
+cl=makeCluster(numProcs)
 registerDoParallel(cl)
 
 #only need control and k-rat exclosure plots
