@@ -417,13 +417,14 @@ finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','
     pradelGR()
   x$species=thisSpp
   x$plot=thisPlot
+  return(x)
 }
 
 finalDF$plotType='control'
 finalDF$plotType[finalDF$plot %in% kratPlots]='kratPlot'
 finalDF=merge(finalDF, resourceLookupTable, all.x=TRUE, all.y=FALSE, by='period')
 
-write.csv(paste(dataFolder, 'finalGrowthDF.csv'), row.names = FALSE)
+write.csv(finalDF, paste(dataFolder, 'finalGrowthDF.csv'), row.names = FALSE)
 
 #ggplot(finalDF, aes(x=totalPrecip, y=growth, colour=species, shape=plotType, group=interaction(species, plotType)))+geom_point()+geom_line()
 #ggplot(filter(finalDF, species=='PP'), aes(x=totalPrecip, y=growth, colour=plotType, group=plotType))+geom_point()
