@@ -11,6 +11,7 @@ if(length(args)>0){
 } else {
   library(marked)
   dataFolder='~/data/portal/'
+  numProcs=2
 }
 
 
@@ -381,32 +382,42 @@ pradelGR=function(df){
 #Setup the data
 ###########################################################################################################
 #Setup parallel processing
-#cl=makeCluster(numCores)
-#registerDoParallel(cl)
+cl=makeCluster(numCores)
+registerDoParallel(cl)
 
 #only need control and k-rat exclosure plots
 controlPlots=c(2,4,8,11,12,14,17,22) #controls
 kratPlots=c(3,6,13,18,19,20) #krat exclosure
 
 #Only model particular spp
-speciesToUse=c('PP','DM')
+speciesToUse=c('PP','DM','OT','PB','DO','PF','PE')
 
 finalDF=data.frame(species=character(), plot=integer(), plotType=character(), nightlyTemp=integer(), p=integer())
 
-#finalDF=foreach(plotType = c('control','exclosure'), .combine=rbind, .packages)
-for(thisPlot in c(controlPlots, kratPlots)){
-  for(thisSpp in speciesToUse){
-    #Get growth rates for this plotType/spp combo
-        print(paste(thisPlot, thisSpp, sep=' '))
-        x = rodents %>%
-          filter(species==thisSpp, plot==thisPlot) %>%
-          pradelGR()
-        x$species=thisSpp
-        x$plot=thisPlot
-        #x=x %>% select(estimate, nightlyTemp, species, plot, plotType)
-        finalDF=rbind(finalDF, x)
-    }
+#Parallet processing needs a single loop to work with, and thus a single data frame. 
+#Thing of this frame like a nested for loop. 
+iterationFrame=expand.grid(c(controlPlots,kratPlots), speciesToUse)
+colnames(iterationFrame)=c('plot','species')
+
+#Don't bother doing models for krats in krat exclosures
+iterationFrame= iterationFrame %>% filter(!(species=='DM' & plot %in% kratPlots )) %>% filter(!(species=='DO' & plot %in% kratPlots ))
+
+# the dopar line is for paralell processing. the do line will do single threaded
+finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
+#finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %do% {
+    
+  thisSpp=as.character(iterationFrame$species[i])
+  thisPlot=as.integer(iterationFrame$plot[i])
+  
+  #Get growth rates for this plotType/spp combo
+  print(paste(thisPlot, thisSpp, sep=' '))
+  x = rodents %>%
+    filter(species==thisSpp, plot==thisPlot) %>%
+    pradelGR()
+  x$species=thisSpp
+  x$plot=thisPlot
 }
+
 finalDF$plotType='control'
 finalDF$plotType[finalDF$plot %in% kratPlots]='kratPlot'
 finalDF=merge(finalDF, resourceLookupTable, all.x=TRUE, all.y=FALSE, by='period')
@@ -415,3 +426,5 @@ write.csv(paste(dataFolder, 'finalGrowthDF.csv'), row.names = FALSE)
 
 #ggplot(finalDF, aes(x=totalPrecip, y=growth, colour=species, shape=plotType, group=interaction(species, plotType)))+geom_point()+geom_line()
 #ggplot(filter(finalDF, species=='PP'), aes(x=totalPrecip, y=growth, colour=plotType, group=plotType))+geom_point()
+#ggplot(filter(finalDF, species=='PP'), aes(x=period, y=growth, colour=plotType, group=plotType))+geom_point()
+
