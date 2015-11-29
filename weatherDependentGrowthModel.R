@@ -1,6 +1,7 @@
 library(dplyr)
 library(doParallel)
 
+#If running this on hipergator, use "Rscript weatherDependentGrowthModel.R hipergator" 
 args=commandArgs(trailingOnly = TRUE)
 if(length(args)>0){
   dataFolder='/scratch/lfs/shawntaylor/data/portal/'
@@ -403,8 +404,8 @@ colnames(iterationFrame)=c('plot','species')
 iterationFrame= iterationFrame %>% filter(!(species=='DM' & plot %in% kratPlots )) %>% filter(!(species=='DO' & plot %in% kratPlots ))
 
 # the dopar line is for paralell processing. the do line will do single threaded
-finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
-#finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %do% {
+#finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
+finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %do% {
     
   thisSpp=as.character(iterationFrame$species[i])
   thisPlot=as.integer(iterationFrame$plot[i])
