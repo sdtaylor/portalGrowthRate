@@ -6,7 +6,7 @@ args=commandArgs(trailingOnly = TRUE)
 if(length(args)>0){
   dataFolder='/scratch/lfs/shawntaylor/data/portal/'
   library(devtools)
-  load_all(paste('/scratch/lfs/shawntaylor/marked/marked/'))
+  install(paste('/scratch/lfs/shawntaylor/marked/marked/'))
   
   numProcs=32
 } else {
@@ -391,7 +391,7 @@ controlPlots=c(2,4,8,11,12,14,17,22) #controls
 kratPlots=c(3,6,13,18,19,20) #krat exclosure
 
 #Only model particular spp
-speciesToUse=c('PP','DM','OT','PB','DO','PF','PE')
+speciesToUse=c('PP','DM','OT','PB')
 
 finalDF=data.frame(species=character(), plot=integer(), plotType=character(), nightlyTemp=integer(), p=integer())
 
@@ -404,8 +404,8 @@ colnames(iterationFrame)=c('plot','species')
 iterationFrame= iterationFrame %>% filter(!(species=='DM' & plot %in% kratPlots )) %>% filter(!(species=='DO' & plot %in% kratPlots ))
 
 # the dopar line is for paralell processing. the do line will do single threaded
-#finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
-finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %do% {
+finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
+#finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %do% {
     
   thisSpp=as.character(iterationFrame$species[i])
   thisPlot=as.integer(iterationFrame$plot[i])
