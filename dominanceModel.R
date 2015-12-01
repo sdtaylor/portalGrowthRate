@@ -349,35 +349,7 @@ runModel=function(df){
   return(model$results$reals)
 }
 
-####################################################################################
-#Get growth rate using Pradel method
-pradelGR=function(df){
-  Phi= df %>%
-    createMarkDF() %>%
-    runModel()
-  Phi=Phi$Phi
-  Phi=arrange(Phi, -occ)
-  
-  Gamma= df %>%
-    createMarkDF(reverse=TRUE) %>%
-    runModel()
-  Gamma=Gamma$Phi
-  Gamma=arrange(Gamma, -occ)
-  
-  periods=sort(unique(df$period))
-  periods=min(periods):max(periods) #Account for some periods not having any captures
-  #Growth rates for each timestep are Phi + Gamma for each interval between sampling occurences. 
-  #Line up gamma estimates with time periods from phi. This is kinda complicated. 
-  Gamma$period=periods[2:length(periods)]
-  Phi$period=periods[(length(periods)-1):1]
- 
-  growthRates=data.frame(period=integer(), growth=integer())
-  #Ineficient for loop for clarities sake
-  for(thisPeriod in periods[2:(length(periods)-1)]){
-    growthRates=rbind(growthRates, data.frame(period=thisPeriod, growth=(Phi$estimate[Phi$period==thisPeriod]/Gamma$estimate[Gamma$period==thisPeriod+1])))
-  } 
-  return(growthRates)
-}
+
 
 #########################################################################################################
 #Setup the data
@@ -387,7 +359,6 @@ cl=makeCluster(numProcs)
 registerDoParallel(cl)
 
 #only need control and k-rat exclosure plots
-controlPlots=c(2,4,8,11,12,14,17,22) #controls
 kratPlots=c(3,6,13,18,19,20) #krat exclosure
 
 #Only model particular spp
