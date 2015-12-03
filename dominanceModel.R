@@ -413,17 +413,20 @@ finalDF=foreach(i=1:20, .combine=rbind, .packages=c('marked','dplyr')) %do% {
   #to model the species with no competitor interaction
   if(thisSpp==rival){
     rival='None'
-    aic=rodents %>%
-      filter(species==thisSpp, plot==thisPlot) %>%
-      createMarkDF(rivalSpp=thisSpp) %>%
-      runModel(rival=FALSE)  
+    aic=try( rodents %>%
+             filter(species==thisSpp, plot==thisPlot) %>%
+             createMarkDF(rivalSpp=thisSpp) %>%
+             runModel(rival=FALSE)  
+    )
   } else {
-    aic=rodents %>%
-      filter(species==thisSpp, plot==thisPlot) %>%
-      createMarkDF(rivalSpp=rival) %>%
-      runModel(rival=TRUE)
+    aic=try( rodents %>%
+             filter(species==thisSpp, plot==thisPlot) %>%
+             createMarkDF(rivalSpp=rival) %>%
+             runModel(rival=TRUE)
+    )
   }
 
+  if(class(aic)=='try-error'){ aic='error'}
   return(c(thisSpp,rival,thisPlot,aic))
 
 }
