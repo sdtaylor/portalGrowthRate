@@ -19,7 +19,7 @@ rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings
 sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
 #1st try. only estimate after 1994 when pit tags were in heavy use. 
-rodents=rodents[rodents$yr>=1995,]
+rodents=rodents[rodents$yr>=2005,]
 rodents=rodents[rodents$yr<=2010,]
 
 #Get trapping dates for *all* periods/plots before I cull things
@@ -201,6 +201,13 @@ resourceLookupTable = trappingDates %>%
   ungroup() %>%
   rowwise() %>%
   mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
+
+resourceLookupTable = rodents %>%
+  mutate(wgt=wgt**0.75) %>%
+  group_by(period, yr, mo) %>%
+  summarize(mte=sum(wgt, na.rm=TRUE)) %>%
+  ungroup() %>%
+  mutate(totalPrecip=mte) #calling mte totalPrecip here so I don't have to change it everywhere else. 
 
 rm(monthlyPrecipTotals, nightlyPrecip, precipRaw, uniqueDays, uniqueMonths, getNightlyTemp, getNightlyPrecip, getPrior6MonthPrecip, doubleDates,
    thisPeriod, thisPlot, thisRow, dateToUse)
