@@ -23,7 +23,7 @@ sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
 #1st try. only estimate after 1994 when pit tags were in heavy use. 
 rodents=rodents[rodents$yr>=1995,]
-rodents=rodents[rodents$yr<=2010,]
+rodents=rodents[rodents$yr<=1996,]
 
 #Get trapping dates for *all* periods/plots before I cull things
 trappingDates=select(rodents, period, yr, mo, dy, plot) %>% distinct()
@@ -268,24 +268,28 @@ getPlotWeatherInfo=function(period, plot){
   return(list(nightlyTemp=nightlyTemp, nightlyPrecip=nightlyPrecip, prior6MonthPrecip=prior6MonthPrecip))
 }
 
+#########################################################
+#Get abundances of a spp over certain periods for use as mark covariates
 
+getCompetitorInfo=function(sppToUse, periods, plotToUse){
+  rodents %>%
+    group_by(plot, period) %>%
+    summarize(N = sum(species==sppToUse)) %>%
+    ungroup() %>%
+    replace(is.na(.), 0) %>%
+    filter(plot==plotToUse, period %in% periods)
+
+}
 
 ##########################################################
 #Combine capture history and nightly weather data of an arbitrary rodent subset
 #This function combines everything above to make a data frame that RMark, or marked will work with. it looks like this.
 #ch, nightlyPrecip1, nightlyPrecip2, nightlyPrecip3, ...... nightlyTemp1, nightlyTemp2, nightlyTemp3,......
 #0010101110....., 0, 0, .3, ....... 14, 12, 14
-createMarkDF=function(rodentDF, reverse=FALSE){
+createMarkDF=function(rodentDF, competingSpp=''){
   ch=processCH(rodentDF)
   tagInfo=rodentDF %>% select(tag, period, plot)
-  
-  if(reverse){
-    newCH=c()
-    for(i in ch$ch){newCH=c(newCH,reverseString(i))}
-    ch$ch=newCH
-    
-
-  } 
+ 
   periods=sort(unique(tagInfo$period))
   periods=min(periods):max(periods)
   tagList=unique(tagInfo$tag)
@@ -302,8 +306,7 @@ createMarkDF=function(rodentDF, reverse=FALSE){
 
   #Put in resources availability. 
   resources=resourceLookupTable %>% filter(period %in% periods)
-  if(reverse){ resources= resources %>% arrange(-period) }
-  
+
   for(thisTagIndex in 1:length(tagList)){
     thisTag=tagList[thisTagIndex]
     #Because some mice roam around the plots, there is an issue with inputting weather info where you can't know which plot
@@ -316,9 +319,6 @@ createMarkDF=function(rodentDF, reverse=FALSE){
     thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
     thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
     
-    if(reverse){ thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(-period) }
-    
-  
     weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
     weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
     weatherDF[thisTagIndex,resourceColNames]=resources$totalPrecip
@@ -359,20 +359,15 @@ cl=makeCluster(numProcs)
 registerDoParallel(cl)
 
 #only need control and k-rat exclosure plots
-kratPlots=c(3,6,13,18,19,20) #krat exclosure
+controlPlots=c(2,4,8,11,12,14,17,22) #controls
 
 #Only model particular spp
-speciesToUse=c('PP','DM','OT','PB')
-
-finalDF=data.frame(species=character(), plot=integer(), plotType=character(), nightlyTemp=integer(), p=integer())
+speciesToUse=c('PP','DM','OT','DO','PB')
 
 #Parallet processing needs a single loop to work with, and thus a single data frame. 
 #Thing of this frame like a nested for loop. 
-iterationFrame=expand.grid(c(controlPlots,kratPlots), speciesToUse)
+iterationFrame=expand.grid(controlPlots, speciesToUse)
 colnames(iterationFrame)=c('plot','species')
-
-#Don't bother doing models for krats in krat exclosures
-iterationFrame= iterationFrame %>% filter(!(species=='DM' & plot %in% kratPlots )) %>% filter(!(species=='DO' & plot %in% kratPlots ))
 
 # the dopar line is for paralell processing. the do line will do single threaded
 finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
@@ -384,8 +379,9 @@ finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','
   #Get growth rates for this plotType/spp combo
   print(paste(thisPlot, thisSpp, sep=' '))
   x = rodents %>%
-    filter(species==thisSpp, plot==thisPlot) %>%
-    pradelGR()
+    filter(species==thisSpp, plot==thisPlot) 
+  
+  
   x$species=thisSpp
   x$plot=thisPlot
   return(x)
