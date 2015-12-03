@@ -299,6 +299,7 @@ createMarkDF=function(rodentDF, rivalSpp=''){
   tagList=tagList[tagList!='000000']
   tagList=sort(tagList)
 
+  #Initialize covaraite dataframe to be paired with the capture history
   weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*3))
   precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
   tempColNames=paste('nightlyTemp',1:length(periods), sep='')
@@ -309,12 +310,14 @@ createMarkDF=function(rodentDF, rivalSpp=''){
   #Put in resources availability. 
   resources=resourceLookupTable %>% filter(period %in% periods)
 
-  #Get abundances of competing species, if any
+  #If making a dataframe with a rival spp abundance, set that up.
   if(length(rivalSpp)>0){
+    #Get rival spp abundances
     thisPlot=unique(rodentDF$plot)
     if(length(thisPlot)>1){stop('only one plot please')}
     rivalAbund=getRivalInfo(rivalSpp, periods, thisPlot)
     
+    #Re-initialize the dataframe with the extra columns
     rivalColNames=paste('rivalAbund',1:length(periods), sep='')
     
     weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*4))
