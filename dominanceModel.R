@@ -272,7 +272,10 @@ getPlotWeatherInfo=function(period, plot){
 #Get abundances of a spp over certain periods for use as mark covariates
 
 getRivalInfo=function(sppToUse, periods, plotToUse){
+  filler=expand.grid(periods,plotToUse) #fills in missing plots where no rodent was caught
+  colnames(filler)=c('period','plot')
   x=rodents %>%
+    full_join(filler, by=c('plot','period')) %>%
     group_by(plot, period) %>%
     summarize(N = sum(species==sppToUse)) %>%
     ungroup() %>%
@@ -287,7 +290,7 @@ getRivalInfo=function(sppToUse, periods, plotToUse){
 #This function combines everything above to make a data frame that RMark, or marked will work with. it looks like this.
 #ch, nightlyPrecip1, nightlyPrecip2, nightlyPrecip3, ...... nightlyTemp1, nightlyTemp2, nightlyTemp3,......
 #0010101110....., 0, 0, .3, ....... 14, 12, 14
-createMarkDF=function(rodentDF, rivalSpp=''){
+createMarkDF=function(rodentDF, rivalSpp=NA){
   ch=processCH(rodentDF)
   tagInfo=rodentDF %>% select(tag, period, plot)
  
@@ -311,7 +314,7 @@ createMarkDF=function(rodentDF, rivalSpp=''){
   resources=resourceLookupTable %>% filter(period %in% periods)
 
   #If making a dataframe with a rival spp abundance, set that up.
-  if(length(rivalSpp)>0){
+  if(!is.na(rivalSpp)){
     #Get rival spp abundances
     thisPlot=unique(rodentDF$plot)
     if(length(thisPlot)>1){stop('only one plot please')}
@@ -341,7 +344,7 @@ createMarkDF=function(rodentDF, rivalSpp=''){
     weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
     weatherDF[thisTagIndex,resourceColNames]=resources$totalPrecip
     
-    if(length(rivalSpp)>0){
+    if(!is.na(rivalSpp)){
       weatherDF[thisTagIndex,rivalColNames]=rivalAbund
     }
     
@@ -355,20 +358,27 @@ createMarkDF=function(rodentDF, rivalSpp=''){
 
 ##################################################################################
 #The mark/recapture model!
-runModel=function(df){
+runModel=function(df, rival=FALSE){
   #Don't understand the need for all this, I just copied it from the marked helpfile.
   x.proc=process.data(df, accumulate=FALSE)
   
   design.p=list(time.varying=c('nightlyPrecip','nightlyTemp'))
-  design.phi=list(time.varying=c('resources'))
+  design.phi=list(time.varying=c('resources','rivalAbund'))
   
   design.parameters=list(p=design.p, Phi=design.phi)
   ddl=make.design.data(x.proc, parameters=design.parameters)
   
-  p.formula=list(formula=~nightlyPrecip+nightlyTemp+Time)
-  phi.formula=list(formula=~resources+Time)
+  if(rival){
+    p.formula=list(formula=~nightlyPrecip+nightlyTemp+Time)
+    phi.formula=list(formula=~resources+rivalAbund+Time)
+  } else {
+    p.formula=list(formula=~nightlyPrecip+nightlyTemp+Time)
+    phi.formula=list(formula=~resources+Time)   
+  }
+  
   model=crm(x.proc, ddl, hessian=FALSE, model.parameters = list(p=p.formula, Phi=phi.formula), accumulate = FALSE, model='cjs')
-  return(model$results$reals)
+  model
+  return(model$results$AIC)
 }
 
 
@@ -385,28 +395,40 @@ controlPlots=c(2,4,8,11,12,14,17,22) #controls
 
 #Only model particular spp
 speciesToUse=c('PP','DM','OT','DO','PB')
+rivalSpp=c('PP','DM','OT','DO','PB')
 
 #Parallet processing needs a single loop to work with, and thus a single data frame. 
 #Thing of this frame like a nested for loop. 
-iterationFrame=expand.grid(controlPlots, speciesToUse)
-colnames(iterationFrame)=c('plot','species')
+iterationFrame=expand.grid(controlPlots, speciesToUse, rivalSpp)
+colnames(iterationFrame)=c('plot','species','rival')
 
 # the dopar line is for paralell processing. the do line will do single threaded
-finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
-#finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %do% {
+#finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
+finalDF=foreach(i=1:20, .combine=rbind, .packages=c('marked','dplyr')) %do% {
     
   thisSpp=as.character(iterationFrame$species[i])
   thisPlot=as.integer(iterationFrame$plot[i])
+  rival=as.character(iterationFrame$rival[i])
   
-  #Get growth rates for this plotType/spp combo
-  print(paste(thisPlot, thisSpp, sep=' '))
-  x = rodents %>%
-    filter(species==thisSpp, plot==thisPlot) 
+  print(c(thisSpp,rival,thisPlot))
   
-  
-  x$species=thisSpp
-  x$plot=thisPlot
-  return(x)
+  #When the rival is the current species being modeled, that will serve as the placeholder
+  #to model the species with no competitor interaction
+  if(thisSpp==rival){
+    rival='None'
+    aic=rodents %>%
+      filter(species==thisSpp, plot==thisPlot) %>%
+      createMarkDF(rivalSpp=thisSpp) %>%
+      runModel(rival=FALSE)  
+  } else {
+    aic=rodents %>%
+      filter(species==thisSpp, plot==thisPlot) %>%
+      createMarkDF(rivalSpp=rival) %>%
+      runModel(rival=TRUE)
+  }
+
+  return(c(thisSpp,rival,thisPlot,aic))
+
 }
 
 finalDF$plotType='control'
