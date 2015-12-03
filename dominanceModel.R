@@ -366,7 +366,7 @@ runModel=function(df, rival=FALSE){
   #Don't understand the need for all this, I just copied it from the marked helpfile.
   x.proc=process.data(df, accumulate=FALSE)
   
-  design.p=list(time.varying=c('nightlyPrecip','nightlyTemp'))
+  design.p=list(time.varying=c('nightlyPrecip','nightlyTemp','rivalAbund'))
   design.phi=list(time.varying=c('resources','rivalAbund'))
   
   design.parameters=list(p=design.p, Phi=design.phi)
@@ -442,7 +442,7 @@ colnames(finalDF)=c('species','rival','plot','aic')
 finalDF=as.data.frame(finalDF)
 
 
-write.csv(finalDF, paste(dataFolder, 'competitionAICscores.csv'), row.names = FALSE)
+write.csv(finalDF, '~/competitionAICscores2005-2010.csv', row.names = FALSE)
 
 #ggplot(finalDF, aes(x=totalPrecip, y=growth, colour=species, shape=plotType, group=interaction(species, plotType)))+geom_point()+geom_line()
 #ggplot(filter(finalDF, species=='PP'), aes(x=totalPrecip, y=growth, colour=plotType, group=plotType))+geom_point()
