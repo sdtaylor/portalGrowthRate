@@ -373,7 +373,7 @@ runModel=function(df, rival=FALSE){
   ddl=make.design.data(x.proc, parameters=design.parameters)
   
   if(rival){
-    p.formula=list(formula=~nightlyPrecip+nightlyTemp)
+    p.formula=list(formula=~nightlyPrecip+nightlyTemp+rivalAbund)
     phi.formula=list(formula=~resources+rivalAbund)
   } else {
     p.formula=list(formula=~nightlyPrecip+nightlyTemp)
