@@ -1,16 +1,13 @@
 library(dplyr)
 library(doParallel)
+library(marked)
 
 #If running this on hipergator, use "Rscript weatherDependentGrowthModel.R hipergator" 
 args=commandArgs(trailingOnly = TRUE)
 if(length(args)>0){
   dataFolder='/scratch/lfs/shawntaylor/data/portal/'
-  library(devtools)
-  install(paste('/scratch/lfs/shawntaylor/marked/marked/'))
-  
   numProcs=32
 } else {
-  library(marked)
   dataFolder='~/data/portal/'
   numProcs=2
 }
@@ -23,7 +20,7 @@ sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
 #1st try. only estimate after 1994 when pit tags were in heavy use. 
 rodents=rodents[rodents$yr>=1995,]
-rodents=rodents[rodents$yr<=1996,]
+rodents=rodents[rodents$yr<=2010,]
 
 #Get trapping dates for *all* periods/plots before I cull things
 trappingDates=select(rodents, period, yr, mo, dy, plot) %>% distinct()
@@ -431,11 +428,11 @@ finalDF=foreach(i=1:20, .combine=rbind, .packages=c('marked','dplyr')) %do% {
 
 }
 
-finalDF$plotType='control'
-finalDF$plotType[finalDF$plot %in% kratPlots]='kratPlot'
-finalDF=merge(finalDF, resourceLookupTable, all.x=TRUE, all.y=FALSE, by='period')
+colnames(finalDF)=c('species','rival','plot','aic')
+finalDF=as.data.frame(finalDF)
 
-write.csv(finalDF, paste(dataFolder, 'finalGrowthDF.csv'), row.names = FALSE)
+
+write.csv(finalDF, paste(dataFolder, 'competitionAICscores.csv'), row.names = FALSE)
 
 #ggplot(finalDF, aes(x=totalPrecip, y=growth, colour=species, shape=plotType, group=interaction(species, plotType)))+geom_point()+geom_line()
 #ggplot(filter(finalDF, species=='PP'), aes(x=totalPrecip, y=growth, colour=plotType, group=plotType))+geom_point()
