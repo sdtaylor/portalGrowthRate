@@ -271,13 +271,14 @@ getPlotWeatherInfo=function(period, plot){
 #########################################################
 #Get abundances of a spp over certain periods for use as mark covariates
 
-getCompetitorInfo=function(sppToUse, periods, plotToUse){
-  rodents %>%
+getRivalInfo=function(sppToUse, periods, plotToUse){
+  x=rodents %>%
     group_by(plot, period) %>%
     summarize(N = sum(species==sppToUse)) %>%
     ungroup() %>%
     replace(is.na(.), 0) %>%
     filter(plot==plotToUse, period %in% periods)
+  return(x$N)
 
 }
 
@@ -286,7 +287,7 @@ getCompetitorInfo=function(sppToUse, periods, plotToUse){
 #This function combines everything above to make a data frame that RMark, or marked will work with. it looks like this.
 #ch, nightlyPrecip1, nightlyPrecip2, nightlyPrecip3, ...... nightlyTemp1, nightlyTemp2, nightlyTemp3,......
 #0010101110....., 0, 0, .3, ....... 14, 12, 14
-createMarkDF=function(rodentDF, competingSpp=''){
+createMarkDF=function(rodentDF, rivalSpp=''){
   ch=processCH(rodentDF)
   tagInfo=rodentDF %>% select(tag, period, plot)
  
@@ -302,11 +303,25 @@ createMarkDF=function(rodentDF, competingSpp=''){
   precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
   tempColNames=paste('nightlyTemp',1:length(periods), sep='')
   resourceColNames=paste('resources',1:length(periods), sep='')
+  
   colnames(weatherDF)=c(precipColNames, tempColNames, resourceColNames)
 
   #Put in resources availability. 
   resources=resourceLookupTable %>% filter(period %in% periods)
 
+  #Get abundances of competing species, if any
+  if(length(rivalSpp)>0){
+    thisPlot=unique(rodentDF$plot)
+    if(length(thisPlot)>1){stop('only one plot please')}
+    rivalAbund=getRivalInfo(rivalSpp, periods, thisPlot)
+    
+    rivalColNames=paste('rivalAbund',1:length(periods), sep='')
+    
+    weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*4))
+    colnames(weatherDF)=c(precipColNames, tempColNames, resourceColNames,rivalColNames)
+    
+  }
+  
   for(thisTagIndex in 1:length(tagList)){
     thisTag=tagList[thisTagIndex]
     #Because some mice roam around the plots, there is an issue with inputting weather info where you can't know which plot
@@ -322,6 +337,10 @@ createMarkDF=function(rodentDF, competingSpp=''){
     weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
     weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
     weatherDF[thisTagIndex,resourceColNames]=resources$totalPrecip
+    
+    if(length(rivalSpp)>0){
+      weatherDF[thisTagIndex,rivalColNames]=rivalAbund
+    }
     
   }
   
