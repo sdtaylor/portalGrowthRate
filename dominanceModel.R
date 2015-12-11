@@ -1,6 +1,7 @@
 library(dplyr)
 library(doParallel)
 library(marked)
+library(lubridate)
 
 #If running this on hipergator, use "Rscript weatherDependentGrowthModel.R hipergator" 
 args=commandArgs(trailingOnly = TRUE)
@@ -19,7 +20,7 @@ rodents=read.csv(paste(dataFolder, 'RodentsAsOfSep2015.csv', sep=''), na.strings
 sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
 #1st try. only estimate after 1994 when pit tags were in heavy use. 
-rodents=rodents[rodents$yr>=2005,]
+rodents=rodents[rodents$yr>=1995,]
 rodents=rodents[rodents$yr<=2010,]
 
 #Get trapping dates for *all* periods/plots before I cull things
@@ -193,21 +194,31 @@ if(file.exists(nightlyLookupTableFile)){
 rm(nightlyLookupTableFile)
 
 #Lookup table for resources (precip) in the last 6 months
-resourceLookupTable = trappingDates %>%
-  select(period,yr,mo) %>%
-  distinct() %>%
-  group_by(period) %>%
-  filter(row_number()==1) %>%
-  ungroup() %>%
-  rowwise() %>%
-  mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
+#resourceLookupTable = trappingDates %>%
+#  select(period,yr,mo) %>%
+#  distinct() %>%
+#  group_by(period) %>%
+#  filter(row_number()==1) %>%
+#  ungroup() %>%
+#  rowwise() %>%
+#  mutate(totalPrecip=getPrior6MonthPrecip(yr, mo))
 
-resourceLookupTable = rodents %>%
-  mutate(wgt=wgt**0.75) %>%
-  group_by(period, yr, mo) %>%
-  summarize(mte=sum(wgt, na.rm=TRUE)) %>%
-  ungroup() %>%
-  mutate(totalPrecip=mte) #calling mte totalPrecip here so I don't have to change it everywhere else. 
+#Resources as ndvi with a time lag. 8 months from Morgan ESA 2015. 
+ndviTimeLag=8
+resourceLookupTable=read.csv(paste(dataFolder,'monthly_NDVI.csv',sep='')) %>%
+  mutate(dateWithLag=as.Date(paste(Date,'-01',sep=''),format='%Y-%m-%d')+months(ndviTimeLag)) %>%
+  mutate(yr=as.numeric(format(dateWithLag, '%Y')), mo=as.numeric(format(dateWithLag, '%m'))) %>%
+  left_join(   select(trappingDates, period,yr,mo) %>% distinct(), by=c('yr','mo')  ) %>%
+  select(NDVI,yr,mo,period) %>%
+  rename(totalPrecip=NDVI)
+
+#Resources as total MTE on that month
+#resourceLookupTable = rodents %>%
+#  mutate(wgt=wgt**0.75) %>%
+#  group_by(period, yr, mo) %>%
+#  summarize(mte=sum(wgt, na.rm=TRUE)) %>%
+#  ungroup() %>%
+#  mutate(totalPrecip=mte) #calling mte totalPrecip here so I don't have to change it everywhere else. 
 
 rm(monthlyPrecipTotals, nightlyPrecip, precipRaw, uniqueDays, uniqueMonths, getNightlyTemp, getNightlyPrecip, getPrior6MonthPrecip, doubleDates,
    thisPeriod, thisPlot, thisRow, dateToUse)
