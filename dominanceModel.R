@@ -21,7 +21,7 @@ sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
 #1st try. only estimate after 1994 when pit tags were in heavy use. 
 rodents=rodents[rodents$yr>=1995,]
-rodents=rodents[rodents$yr<=1996,]
+rodents=rodents[rodents$yr<=2010,]
 
 #Get trapping dates for *all* periods/plots before I cull things
 trappingDates=select(rodents, period, yr, mo, dy, plot) %>% distinct()
@@ -305,13 +305,23 @@ getRivalInfo=function(sppToUse, periods, plotToUse){
 
 }
 
+#####################
+#Reverse a single string. Used to compute gamma below
+reverseString=function(x){return(paste(rev(strsplit(x,NULL)[[1]]),collapse=""))}
+
 ##########################################################
 #Combine capture history and nightly weather data of an arbitrary rodent subset
 #This function combines everything above to make a data frame that RMark, or marked will work with. it looks like this.
 #ch, nightlyPrecip1, nightlyPrecip2, nightlyPrecip3, ...... nightlyTemp1, nightlyTemp2, nightlyTemp3,......
 #0010101110....., 0, 0, .3, ....... 14, 12, 14
-createMarkDF=function(rodentDF, rivalSpp=NA){
+createMarkDF=function(rodentDF, rivalSpp=NA, reverse=FALSE){
   ch=processCH(rodentDF)
+  if(reverse){
+    newCH=c()
+    for(i in ch$ch){newCH=c(newCH,reverseString(i))}
+    ch$ch=newCH
+  } 
+  
   tagInfo=rodentDF %>% select(tag, period, plot)
 
   thisPlot=unique(rodentDF$plot)
@@ -337,6 +347,11 @@ createMarkDF=function(rodentDF, rivalSpp=NA){
   resources=resourceLookupTable %>% filter(period %in% periods) %>% arrange(period)
   habitat=habitatLookupTable %>% filter(period %in% periods, plot == thisPlot) %>% arrange(period)
 
+  if(reverse){ 
+    resources= resources %>% arrange(-period)
+    habitat = habitat %>% arrange(-period)
+  }
+  
   #If making a dataframe with a rival spp abundance, set that up.
   if(!is.na(rivalSpp)){
     #Get rival spp abundances
@@ -362,6 +377,8 @@ createMarkDF=function(rodentDF, rivalSpp=NA){
     
     thisTagPeriodInfo=merge(thisTagPeriodInfo, nightlyLookupTable, by=c('period','plot'), all.x=TRUE, all.y=FALSE)
     thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(period)
+    
+    if(reverse){ thisTagPeriodInfo= thisTagPeriodInfo %>% arrange(-period) }
     
     weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
     weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
@@ -463,7 +480,7 @@ colnames(finalDF)=c('species','rival','plot','aic')
 finalDF=as.data.frame(finalDF)
 
 
-write.csv(finalDF, '~/competitionAICscores2005-2010.csv', row.names = FALSE)
+write.csv(finalDF, '~/competitionAICscores1995-2010.csv', row.names = FALSE)
 
 #ggplot(finalDF, aes(x=totalPrecip, y=growth, colour=species, shape=plotType, group=interaction(species, plotType)))+geom_point()+geom_line()
 #ggplot(filter(finalDF, species=='PP'), aes(x=totalPrecip, y=growth, colour=plotType, group=plotType))+geom_point()
