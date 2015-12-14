@@ -297,7 +297,7 @@ getRivalInfo=function(sppToUse, periods, plotToUse){
   x=rodents %>%
     full_join(filler, by=c('plot','period')) %>%
     group_by(plot, period) %>%
-    summarize(N = sum(species==sppToUse)) %>%
+    summarize(N = sum(species!=sppToUse)) %>%
     ungroup() %>%
     replace(is.na(.), 0) %>%
     filter(plot==plotToUse, period %in% periods)
@@ -356,7 +356,7 @@ createMarkDF=function(rodentDF, rivalSpp=NA, reverse=FALSE){
   if(!is.na(rivalSpp)){
     #Get rival spp abundances
     if(length(thisPlot)>1){stop('only one plot please')}
-    rivalAbund=getRivalInfo(rivalSpp, periods, thisPlot)
+    rivalAbund=getRivalInfo(thisSpp, periods, thisPlot)
     
     #Re-initialize the dataframe with the extra columns
     rivalColNames=paste('rivalAbund',1:length(periods), sep='')
@@ -438,6 +438,7 @@ controlPlots=c(2,4,8,11,12,14,17,22) #controls
 #Only model particular spp
 speciesToUse=c('PP','DM','OT','DO','PB')
 rivalSpp=c('PP','DM','OT','DO','PB')
+rivalSpp=c('All')
 
 #Parallet processing needs a single loop to work with, and thus a single data frame. 
 #Thing of this frame like a nested for loop. 
