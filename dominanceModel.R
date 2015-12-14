@@ -21,7 +21,7 @@ sppCodes=read.csv(paste(dataFolder, 'PortalMammals_species.csv', sep=''))
 
 #1st try. only estimate after 1994 when pit tags were in heavy use. 
 rodents=rodents[rodents$yr>=1995,]
-rodents=rodents[rodents$yr<=2010,]
+rodents=rodents[rodents$yr<=1996,]
 
 #Get trapping dates for *all* periods/plots before I cull things
 trappingDates=select(rodents, period, yr, mo, dy, plot) %>% distinct()
@@ -212,6 +212,11 @@ resourceLookupTable=read.csv(paste(dataFolder,'monthly_NDVI.csv',sep='')) %>%
   select(NDVI,yr,mo,period) %>%
   rename(totalPrecip=NDVI)
 
+habitatLookupTable= read.csv(paste(dataFolder,'shrubCoverModeled.csv',sep='')) %>%
+  mutate(Plot= as.numeric(substr(Plot,5,6))) %>%
+  rename(plot=Plot, yr=Year) %>%
+  left_join( select(trappingDates, period,yr,plot) %>% distinct(), by=c('plot','yr')) 
+
 #Resources as total MTE on that month
 #resourceLookupTable = rodents %>%
 #  mutate(wgt=wgt**0.75) %>%
@@ -308,7 +313,9 @@ getRivalInfo=function(sppToUse, periods, plotToUse){
 createMarkDF=function(rodentDF, rivalSpp=NA){
   ch=processCH(rodentDF)
   tagInfo=rodentDF %>% select(tag, period, plot)
- 
+
+  thisPlot=unique(rodentDF$plot)
+  
   periods=sort(unique(tagInfo$period))
   periods=min(periods):max(periods)
   tagList=unique(tagInfo$tag)
@@ -318,28 +325,29 @@ createMarkDF=function(rodentDF, rivalSpp=NA){
   tagList=sort(tagList)
 
   #Initialize covaraite dataframe to be paired with the capture history
-  weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*3))
+  weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*4))
   precipColNames=paste('nightlyPrecip',1:length(periods), sep='')
   tempColNames=paste('nightlyTemp',1:length(periods), sep='')
   resourceColNames=paste('resources',1:length(periods), sep='')
+  habitatColNames=paste('habitat',1:length(periods),sep='')
   
-  colnames(weatherDF)=c(precipColNames, tempColNames, resourceColNames)
+  colnames(weatherDF)=c(precipColNames, tempColNames, resourceColNames,habitatColNames)
 
-  #Put in resources availability. 
-  resources=resourceLookupTable %>% filter(period %in% periods)
+  #Put in resource and habaitat availability. 
+  resources=resourceLookupTable %>% filter(period %in% periods) %>% arrange(period)
+  habitat=habitatLookupTable %>% filter(period %in% periods, plot == thisPlot) %>% arrange(period)
 
   #If making a dataframe with a rival spp abundance, set that up.
   if(!is.na(rivalSpp)){
     #Get rival spp abundances
-    thisPlot=unique(rodentDF$plot)
     if(length(thisPlot)>1){stop('only one plot please')}
     rivalAbund=getRivalInfo(rivalSpp, periods, thisPlot)
     
     #Re-initialize the dataframe with the extra columns
     rivalColNames=paste('rivalAbund',1:length(periods), sep='')
     
-    weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*4))
-    colnames(weatherDF)=c(precipColNames, tempColNames, resourceColNames,rivalColNames)
+    weatherDF=data.frame(matrix(data=NA, nrow=length(tagList), ncol=length(periods)*5))
+    colnames(weatherDF)=c(precipColNames, tempColNames, resourceColNames,rivalColNames,habitatColNames)
     
   }
   
@@ -358,6 +366,8 @@ createMarkDF=function(rodentDF, rivalSpp=NA){
     weatherDF[thisTagIndex,precipColNames]=thisTagPeriodInfo$precip
     weatherDF[thisTagIndex,tempColNames]=thisTagPeriodInfo$lowTemp
     weatherDF[thisTagIndex,resourceColNames]=resources$totalPrecip
+    weatherDF[thisTagIndex,habitatColNames]=habitat$cover
+    
     
     if(!is.na(rivalSpp)){
       weatherDF[thisTagIndex,rivalColNames]=rivalAbund
