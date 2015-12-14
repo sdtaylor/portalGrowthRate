@@ -437,7 +437,7 @@ controlPlots=c(2,4,8,11,12,14,17,22) #controls
 
 #Only model particular spp
 speciesToUse=c('PP','DM','OT','DO','PB')
-rivalSpp=c('PP','DM','OT','DO','PB')
+#rivalSpp=c('PP','DM','OT','DO','PB')
 rivalSpp=c('All')
 
 #Parallet processing needs a single loop to work with, and thus a single data frame. 
@@ -445,9 +445,12 @@ rivalSpp=c('All')
 iterationFrame=expand.grid(controlPlots, speciesToUse, rivalSpp)
 colnames(iterationFrame)=c('plot','species','rival')
 
+tempFrame=iterationFrame %>% mutate(rival=species)
+iterationFrame=rbind(iterationFrame, tempFrame)
+
 # the dopar line is for paralell processing. the do line will do single threaded
 #finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %dopar% {
-finalDF=foreach(i=1:20, .combine=rbind, .packages=c('marked','dplyr')) %do% {
+finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','dplyr')) %do% {
     
   thisSpp=as.character(iterationFrame$species[i])
   thisPlot=as.integer(iterationFrame$plot[i])
