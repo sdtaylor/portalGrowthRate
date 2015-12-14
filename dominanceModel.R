@@ -388,17 +388,17 @@ runModel=function(df, rival=FALSE){
   x.proc=process.data(df, accumulate=FALSE)
   
   design.p=list(time.varying=c('nightlyPrecip','nightlyTemp','rivalAbund'))
-  design.phi=list(time.varying=c('resources','rivalAbund'))
+  design.phi=list(time.varying=c('resources','rivalAbund','habitat'))
   
   design.parameters=list(p=design.p, Phi=design.phi)
   ddl=make.design.data(x.proc, parameters=design.parameters)
   
   if(rival){
     p.formula=list(formula=~nightlyPrecip+nightlyTemp+rivalAbund)
-    phi.formula=list(formula=~resources+rivalAbund)
+    phi.formula=list(formula=~resources+habitat+rivalAbund)
   } else {
     p.formula=list(formula=~nightlyPrecip+nightlyTemp)
-    phi.formula=list(formula=~resources)   
+    phi.formula=list(formula=~resources+habitat)   
   }
   
   model=crm(x.proc, ddl, hessian=FALSE, model.parameters = list(p=p.formula, Phi=phi.formula), accumulate = FALSE, model='cjs')
