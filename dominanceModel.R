@@ -464,13 +464,13 @@ finalDF=foreach(i=1:nrow(iterationFrame), .combine=rbind, .packages=c('marked','
     rival='None'
     aic=try( rodents %>%
              filter(species==thisSpp, plot==thisPlot) %>%
-             createMarkDF(rivalSpp=thisSpp, reverse=TRUE) %>%
+             createMarkDF(rivalSpp=thisSpp, reverse=FALSE) %>%
              runModel(rival=FALSE)  
     )
   } else {
     aic=try( rodents %>%
              filter(species==thisSpp, plot==thisPlot) %>%
-             createMarkDF(rivalSpp=rival, reverse=TRUE) %>%
+             createMarkDF(rivalSpp=rival, reverse=FALSE) %>%
              runModel(rival=TRUE)
     )
   }
